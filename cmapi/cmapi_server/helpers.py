@@ -372,6 +372,11 @@ def broadcast_new_config(
                 logging.warning(
                     f'Timeout while pushing new config to "{node}"'
                 )
+            except requests.exceptions.RequestException as e:
+                logging.warning(
+                    'Error while pushing new config to "%s": %s"', node, str(e)
+                )
+                logging.debug('Response: %s', r.text)
             except Exception as e:
                 logging.warning(
                     f'Got an unexpected error pushing new config to "{node}"',
@@ -461,7 +466,7 @@ def get_config_parser(
     except PermissionError as e:
         # TODO: looks like it's useless here, because of creating config
         #       from default on cmapi server startup
-        #       Anyway looks like it have to raise error and then
+        #       Anyway looks like it has to raise error and then
         #       return 500 error
         logging.error(
             'CMAPI cannot create configuration file. '
@@ -826,7 +831,7 @@ def cmapi_config_check(cmapi_conf_path: str = CMAPI_CONF_PATH):
     """
     if not os.path.exists(cmapi_conf_path):
         logging.info(
-            f'There are no config file at "{cmapi_conf_path}". '
+            f'There is no config file at "{cmapi_conf_path}". '
             f'So copy default config from {CMAPI_DEFAULT_CONF_PATH} there.'
         )
         copyfile(CMAPI_DEFAULT_CONF_PATH, cmapi_conf_path)

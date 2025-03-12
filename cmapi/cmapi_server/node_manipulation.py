@@ -55,7 +55,7 @@ def switch_node_maintenance(
         maintenance_element = etree.SubElement(config_root, 'Maintenance')
     maintenance_element.text = str(maintenance_state).lower()
     node_config.write_config(config_root, filename=output_config_filename)
-    # TODO: probably move publishing to cherrypy.emgine failover channel here?
+    # TODO: probably move publishing to cherrypy.engine failover channel here?
 
 
 def add_node(
