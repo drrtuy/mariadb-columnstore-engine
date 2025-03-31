@@ -417,7 +417,7 @@ class ConfigController:
             )
             if in_maintenance_state():
                 module_logger.info(
-                    'Maintaninance state is active in new config. '
+                    'Maintenance state is active in new config. '
                     'MCS processes should not be started.'
                 )
                 cherrypy.engine.publish('failover', False)
