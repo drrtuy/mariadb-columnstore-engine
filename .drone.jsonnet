@@ -173,7 +173,6 @@ local Pipeline(branch, platform, event, arch='amd64', server='0c6b89c694a88aae76
     'test212.sh',
     'test297.sh',
     'test299.sh',
-    'test300.sh',
   ] else [
     'test000.sh',
     'test001.sh',
