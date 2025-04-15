@@ -169,7 +169,10 @@ void pushReturnedCol(gp_walk_info& gwi, Item* from, SRCP rc)
   {
     Item* ith = gwi.processed[i].first;
 
-    bool same = ith->eq(from, false);
+    // made within MCOL-5776 produced bug MCOL-5932 so, the check of equal columns is disabled
+    // FIXME: enable the check of equal columns
+    //bool same = ith->eq(from, false);
+    bool same = false;
 
     if (same && ith->type() == Item::FUNC_ITEM)
     {
@@ -8036,7 +8039,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 
             continue;
           }
-
+          // FIXME: usage of pushReturnedCol instead of gwi.returnedCols.push_back(srcp) here
+          // made within MCOL-5776 produced bug MCOL-5932 so, the check of equal columns is disabled
           pushReturnedCol(gwi, item, srcp);
         }
         else  // This was a vtable post-process block
