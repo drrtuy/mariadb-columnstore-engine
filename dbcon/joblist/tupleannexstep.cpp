@@ -574,6 +574,13 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
       dataVec.pop_back();
     }
   }
+  catch (const std::bad_alloc&)
+  {
+    auto errorCode = ERR_TNS_DISTINCT_IS_TOO_BIG;
+    auto newException = IDBExcept(errorCode);
+    handleException(std::make_exception_ptr(newException), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
+                    "TupleAnnexStep::executeNoOrderByWithDistinct()");
+  }
   catch (...)
   {
     handleException(std::current_exception(), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
@@ -676,6 +683,13 @@ void TupleAnnexStep::executeWithOrderBy()
       }
     }
   }
+  catch (const std::bad_alloc&)
+  {
+    auto errorCode = fOrderBy->getErrorCode();
+    auto newException = IDBExcept(errorCode);
+    handleException(std::make_exception_ptr(newException), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
+                    "TupleAnnexStep::executeWithOrderBy()");
+  }
   catch (...)
   {
     handleException(std::current_exception(), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
@@ -746,6 +760,13 @@ void TupleAnnexStep::finalizeParallelOrderByDistinct()
         currentPQ.pop();
       }
     }
+  }
+  catch (const std::bad_alloc&)
+  {
+    auto errorCode = fOrderBy->getErrorCode();
+    auto newException = IDBExcept(errorCode);
+    handleException(std::make_exception_ptr(newException), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
+                    "TupleAnnexStep::finalizeParallelOrderByDistinct()");
   }
   catch (...)
   {
@@ -938,6 +959,13 @@ void TupleAnnexStep::finalizeParallelOrderBy()
         currentPQ.pop();
       }
     }
+  }
+  catch (const std::bad_alloc&)
+  {
+    auto errorCode = fOrderBy->getErrorCode();
+    auto newException = IDBExcept(errorCode);
+    handleException(std::make_exception_ptr(newException), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
+                    "TupleAnnexStep::finalizeParallelOrderBy()");
   }
   catch (...)
   {
@@ -1146,6 +1174,13 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
       if (more)
         dlOffset++;
     }
+  }
+  catch (const std::bad_alloc&)
+  {
+    auto errorCode = fOrderBy->getErrorCode();
+    auto newException = IDBExcept(errorCode);
+    handleException(std::make_exception_ptr(newException), logging::ERR_IN_PROCESS, logging::ERR_ALWAYS_CRITICAL,
+                    "TupleAnnexStep::executeParallelOrderBy()");
   }
   catch (...)
   {
