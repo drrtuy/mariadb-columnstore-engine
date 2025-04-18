@@ -434,6 +434,11 @@ class IdbOrderBy : public IdbCompare
   {
     return *fOrderByQueue;
   }
+  uint64_t getErrorCode() const
+  {
+    return fErrorCode;
+  }
+
   void returnAllRGDataMemory2RM()
   {
     while (!fOrderByQueue->empty())
