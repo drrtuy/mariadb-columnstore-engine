@@ -22,7 +22,10 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdlib>
+
 #include "atomicops.h"
+#include "errorids.h"
+#include "outofmemoryexcept.h"
 
 namespace allocators
 {
@@ -80,10 +83,10 @@ class CountingAllocator
       if (currentGlobalMemoryLimit < memoryLimitLowerBound_)
       {
         atomicops::atomicAddRef(*memoryLimit_, lastMemoryLimitCheckpointDiff);
-        throw std::bad_alloc();
+        throw logging::OutOfMemoryExcept(logging::ERR_OUT_OF_MEMORY);
       }
       lastMemoryLimitCheckpoint_ += lastMemoryLimitCheckpointDiff;
-    }
+    } 
 
     currentLocalMemoryUsage_ += sizeChange;
   }
