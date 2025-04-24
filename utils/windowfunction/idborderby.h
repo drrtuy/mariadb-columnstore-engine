@@ -36,7 +36,7 @@
 #include "resourcemanager.h"
 #include "rowgroup.h"
 #include "hasher.h"
-// #include "stlpoolallocator.h"
+#include "stlpoolallocator.h"
 
 // forward reference
 namespace joblist
@@ -80,6 +80,31 @@ class ReservablePQ : private std::priority_queue<_Tp, _Sequence, _Compare>
   using std::priority_queue<_Tp, _Sequence, _Compare>::push;
   using std::priority_queue<_Tp, _Sequence, _Compare>::empty;
 };
+
+// template <typename _Tp, typename _Sequence = std::vector<_Tp>,
+//           typename _Compare = std::less<typename _Sequence::value_type> >
+// class ReservablePQ : private std::priority_queue<_Tp, _Sequence, _Compare>
+// {
+//  public:
+//   typedef typename std::priority_queue<_Tp, _Sequence, _Compare>::size_type size_type;
+//   explicit ReservablePQ(size_type capacity = 0)
+//   {
+//     reserve(capacity);
+//   };
+//   void reserve(size_type capacity)
+//   {
+//     this->c.reserve(capacity);
+//   }
+//   size_type capacity() const
+//   {
+//     return this->c.capacity();
+//   }
+//   using std::priority_queue<_Tp, _Sequence, _Compare>::size;
+//   using std::priority_queue<_Tp, _Sequence, _Compare>::top;
+//   using std::priority_queue<_Tp, _Sequence, _Compare>::pop;
+//   using std::priority_queue<_Tp, _Sequence, _Compare>::push;
+//   using std::priority_queue<_Tp, _Sequence, _Compare>::empty;
+// };
 
 // forward reference
 class IdbCompare;
@@ -484,7 +509,7 @@ class IdbOrderBy : public IdbCompare
   };
 
   using DistinctMap_t = std::unordered_set<rowgroup::Row::Pointer, Hasher, Eq,
-                                  allocators::CountingAllocator<rowgroup::Row::Pointer>>;
+                                  utils::STLPoolAllocator<rowgroup::Row::Pointer>>;
   boost::scoped_ptr<DistinctMap_t> fDistinctMap;
   rowgroup::Row row1, row2;  // scratch space for Hasher & Eq
 

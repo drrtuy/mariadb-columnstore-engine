@@ -83,7 +83,10 @@ struct TAEq
   bool operator()(const rowgroup::Row::Pointer&, const rowgroup::Row::Pointer&) const;
 };
 // TODO:  Generalize these and put them back in utils/common/hasher.h
-using TNSDistinctMap_t = std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq, allocators::CountingAllocator<rowgroup::Row::Pointer> >;
+// using TNSDistinctMap_t = std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq,
+// allocators::CountingAllocator<rowgroup::Row::Pointer> >;
+using TNSDistinctMap_t =
+    std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq, STLPoolAllocator<rowgroup::Row::Pointer> >;
 };  // namespace
 
 inline uint64_t TAHasher::operator()(const Row::Pointer& p) const
@@ -164,7 +167,7 @@ void TupleAnnexStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 
 void TupleAnnexStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 {
-  // Initialize ResourceManager to acount memory usage. 
+  // Initialize ResourceManager to acount memory usage.
   fRm = jobInfo.rm;
   // Initialize structures used by separate workers
   uint64_t id = 1;
@@ -456,8 +459,11 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
   Row rowSkip;
   bool more = false;
 
-  auto alloc = fRm->getAllocator<rowgroup::Row::Pointer>();
-  std::unique_ptr<TNSDistinctMap_t> distinctMap(new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), alloc));
+  // auto alloc = fRm->getAllocator<rowgroup::Row::Pointer>();
+  // std::unique_ptr<TNSDistinctMap_t> distinctMap(new TNSDistinctMap_t(10, TAHasher(this), TAEq(this),
+  // alloc));
+  std::unique_ptr<TNSDistinctMap_t> distinctMap(
+      new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), STLPoolAllocator<rowgroup::Row::Pointer>(fRm)));
 
   rgDataOut.reinit(fRowGroupOut);
   fRowGroupOut.setData(&rgDataOut);
@@ -588,12 +594,13 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 
 void TupleAnnexStep::checkAndAllocateMemory4RGData(const rowgroup::RowGroup& rowGroup)
 {
-    uint64_t size = rowGroup.getSizeWithStrings() - rowGroup.getHeaderSize();
-    if (!fRm->getMemory(size, false))
-    {
-        cerr << IDBErrorInfo::instance()->errorMsg(ERR_TNS_DISTINCT_IS_TOO_BIG) << " @" << __FILE__ << ":" << __LINE__;
-        throw IDBExcept(ERR_TNS_DISTINCT_IS_TOO_BIG);
-    }
+  uint64_t size = rowGroup.getSizeWithStrings() - rowGroup.getHeaderSize();
+  if (!fRm->getMemory(size, false))
+  {
+    cerr << IDBErrorInfo::instance()->errorMsg(ERR_TNS_DISTINCT_IS_TOO_BIG) << " @" << __FILE__ << ":"
+         << __LINE__;
+    throw IDBExcept(ERR_TNS_DISTINCT_IS_TOO_BIG);
+  }
 }
 
 void TupleAnnexStep::executeWithOrderBy()
@@ -713,10 +720,12 @@ void TupleAnnexStep::finalizeParallelOrderByDistinct()
   // Calculate offset here
   fRowGroupOut.getRow(0, &fRowOut);
 
-  auto allocSorting = fRm->getAllocator<ordering::OrderByRow>();
-  ordering::SortingPQ finalPQ(rowgroup::rgCommonSize, allocSorting);
-  auto allocDistinct = fRm->getAllocator<rowgroup::Row::Pointer>();
-  std::unique_ptr<TNSDistinctMap_t> distinctMap(new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), allocDistinct));
+  // auto allocSorting = fRm->getAllocator<ordering::OrderByRow>();
+  ordering::SortingPQ finalPQ(rowgroup::rgCommonSize, fRm->getAllocator<ordering::OrderByRow>());
+  // ordering::SortingPQ finalPQ(rowgroup::rgCommonSize);
+  // auto allocDistinct = fRm->getAllocator<rowgroup::Row::Pointer>();
+  std::unique_ptr<TNSDistinctMap_t> distinctMap(
+      new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), STLPoolAllocator<rowgroup::Row::Pointer>(fRm)));
   fRowGroupIn.initRow(&row1);
   fRowGroupIn.initRow(&row2);
 
@@ -910,8 +919,9 @@ void TupleAnnexStep::finalizeParallelOrderBy()
   uint32_t rowSize = 0;
 
   rowgroup::RGData rgDataOut;
-  auto alloc = fRm->getAllocator<ordering::OrderByRow>();
-  ordering::SortingPQ finalPQ(rowgroup::rgCommonSize, alloc);
+  // auto alloc = fRm->getAllocator<ordering::OrderByRow>();
+  ordering::SortingPQ finalPQ(rowgroup::rgCommonSize, fRm->getAllocator<ordering::OrderByRow>());
+  // ordering::SortingPQ finalPQ(rowgroup::rgCommonSize);
   rgDataOut.reinit(fRowGroupOut, rowgroup::rgCommonSize);
   fRowGroupOut.setData(&rgDataOut);
   fRowGroupOut.resetRowGroup(0);
