@@ -333,9 +333,14 @@ class ResourceManager
   }
   inline int64_t availableMemory() const
   {
-    return totalUmMemLimit.load(std::memory_order_relaxed);
+    return atomicops::atomicLoadRef(totalUmMemLimit);
   }
 
+  inline void setMemory(int64_t amount) 
+  {
+    atomicops::atomicStoreRef(totalUmMemLimit, amount);
+  }
+  
   /* old HJ mem interface, used by HashJoin */
   uint64_t getHjPmMaxMemorySmallSide(uint32_t sessionID)
   {

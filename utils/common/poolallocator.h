@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <unistd.h>
 #include <stdint.h>
 #include <optional>
@@ -32,9 +33,10 @@
 #include <map>
 #include <memory>
 
+#include <iostream>
+
 #include <boost/smart_ptr/allocate_shared_array.hpp>
 
-#include <atomic>
 
 #include "countingallocator.h"
 
@@ -57,6 +59,7 @@ class PoolAllocator
    , useLock(_useLock)
    , lock(false)
   {
+    std::cout << "PoolAllocator w/o counting allocator created" << std::endl;
   }
   PoolAllocator(allocators::CountingAllocator<PoolAllocatorBufType> alloc, unsigned windowSize = DEFAULT_WINDOW_SIZE,
                 bool isTmpSpace = false, bool _useLock = false)
@@ -69,6 +72,7 @@ class PoolAllocator
    , lock(false)
    , alloc(alloc)
   {
+    std::cout << "PoolAllocator with counting allocator created" << std::endl;
   }
   PoolAllocator(const PoolAllocator& p)
    : allocSize(p.allocSize)
