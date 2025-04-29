@@ -101,13 +101,13 @@ STLPoolAllocator<T>::STLPoolAllocator(joblist::ResourceManager* rm)
 {
   if (rm) 
   {
-    std::cout << "STLPoolAllocator with RM " << std::endl;
-    auto alloc = rm->getAllocator<PoolAllocatorBufType>();
+    // std::cout << "STLPoolAllocator with RM " << std::endl;
+    auto alloc = rm->getAllocator<PoolAllocatorBufType>(1024);
     pa.reset(new PoolAllocator(alloc, DEFAULT_SIZE));
   }
   else
   {
-    std::cout << "STLPoolAllocator w/o RM " << std::endl;
+    // std::cout << "STLPoolAllocator w/o RM " << std::endl;
     pa.reset(new PoolAllocator(DEFAULT_SIZE));
   }
 }

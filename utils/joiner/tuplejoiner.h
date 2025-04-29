@@ -497,6 +497,9 @@ class TupleJoiner
   template<typename K, typename V>
   using HashMapTemplate = std::unordered_multimap<K, V, hasher, std::equal_to<K>,
                                                  utils::STLPoolAllocator<std::pair<const K, V>>>;
+  // template<typename K, typename V>
+  // using HashMapTemplate = std::unordered_multimap<K, V, hasher, std::equal_to<K>,
+  //                                               allocators::CountingAllocator<std::pair<const K, V>>>;
   using hash_t = HashMapTemplate<int64_t, uint8_t*>;
   using sthash_t = HashMapTemplate<int64_t, rowgroup::Row::Pointer>;
   using typelesshash_t = HashMapTemplate<TypelessData, rowgroup::Row::Pointer>;
