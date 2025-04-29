@@ -43,19 +43,13 @@ constexpr const size_t DEFAULT_BUCKET_COUNT = 10;
 template <typename HashTable>
 std::unique_ptr<HashTable> makeHashMap(size_t bucketCount, ResourceManager* resourceManager)
 {
-  // auto alloc = resourceManager->getAllocator<T>();
-  // return std::unique_ptr<T>(new T(bucketCount, TupleJoiner::hasher(), typename T::key_equal(), alloc));
-  // std::cout << " makeHashMap " << std::endl;
   return std::unique_ptr<HashTable>(new HashTable(bucketCount, TupleJoiner::hasher(),
                                                   typename HashTable::key_equal(),
-                                                  // resourceManager->getAllocator<typename HashTable::value_type>()));
                                                   utils::STLPoolAllocator<typename HashTable::value_type>(resourceManager)));
 }
 
 void TupleJoiner::initRowsVector()
 {
-  // auto alloc = resourceManager_->getAllocator<rowgroup::Row::Pointer>();
-  // rows.reset(new RowPointersVec(alloc));
   rows.reset(new RowPointersVec(resourceManager_->getAllocator<rowgroup::Row::Pointer>()));
 }
 
@@ -65,9 +59,6 @@ void TupleJoiner::initHashMaps(uint32_t& smallJoinColumn)
   {
     for (size_t i = 0; i < bucketCount; i++)
     {
-      // auto alloc = resourceManager_->getAllocator<pair<const TypelessData, Row::Pointer>>();
-      // ht.emplace_back(std::unique_ptr<typelesshash_t>(
-      //     new typelesshash_t(DEFAULT_BUCKET_COUNT, hasher(), typelesshash_t::key_equal(), alloc)));
       ht.emplace_back(makeHashMap<typelesshash_t>(DEFAULT_BUCKET_COUNT, resourceManager_));
     }
   }
@@ -75,9 +66,6 @@ void TupleJoiner::initHashMaps(uint32_t& smallJoinColumn)
   {
     for (size_t i = 0; i < bucketCount; i++)
     {
-      // auto alloc = resourceManager_->getAllocator<pair<const long double, Row::Pointer>>();
-      // ld.emplace_back(std::unique_ptr<ldhash_t>(
-      //     new ldhash_t(DEFAULT_BUCKET_COUNT, hasher(), ldhash_t::key_equal(), alloc)));
       ld.emplace_back(makeHashMap<ldhash_t>(DEFAULT_BUCKET_COUNT, resourceManager_));
     }
   }
@@ -85,9 +73,6 @@ void TupleJoiner::initHashMaps(uint32_t& smallJoinColumn)
   {
     for (size_t i = 0; i < bucketCount; i++)
     {
-      // auto alloc = resourceManager_->getAllocator<pair<const int64_t, Row::Pointer>>();
-      // sth.emplace_back(std::unique_ptr<sthash_t>(
-      //     new sthash_t(DEFAULT_BUCKET_COUNT, hasher(), sthash_t::key_equal(), alloc)));
       sth.emplace_back(makeHashMap<sthash_t>(DEFAULT_BUCKET_COUNT, resourceManager_));
     }
   }
@@ -95,9 +80,6 @@ void TupleJoiner::initHashMaps(uint32_t& smallJoinColumn)
   {
     for (size_t i = 0; i < bucketCount; i++)
     {
-      // auto alloc = resourceManager_->getAllocator<pair<const int64_t, uint8_t*>>();
-      // h.emplace_back(
-      //     std::unique_ptr<hash_t>(new hash_t(DEFAULT_BUCKET_COUNT, hasher(), hash_t::key_equal(), alloc)));
       h.emplace_back(makeHashMap<hash_t>(DEFAULT_BUCKET_COUNT, resourceManager_));
     }
   }

@@ -83,11 +83,8 @@ struct TAEq
   bool operator()(const rowgroup::Row::Pointer&, const rowgroup::Row::Pointer&) const;
 };
 // TODO:  Generalize these and put them back in utils/common/hasher.h
-// using TNSDistinctMap_t = std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq,
-// allocators::CountingAllocator<rowgroup::Row::Pointer> >;
-using TNSDistinctMap_t = std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq>;
-// using TNSDistinctMap_t =
-//     std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq, STLPoolAllocator<rowgroup::Row::Pointer> >;
+using TNSDistinctMap_t =
+    std::unordered_set<rowgroup::Row::Pointer, TAHasher, TAEq, STLPoolAllocator<rowgroup::Row::Pointer> >;
 };  // namespace
 
 inline uint64_t TAHasher::operator()(const Row::Pointer& p) const
@@ -460,13 +457,8 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
   Row rowSkip;
   bool more = false;
 
-  // auto alloc = fRm->getAllocator<rowgroup::Row::Pointer>();
-  // std::unique_ptr<TNSDistinctMap_t> distinctMap(new TNSDistinctMap_t(10, TAHasher(this), TAEq(this),
-  // alloc));
-  // WIP
-  // std::unique_ptr<TNSDistinctMap_t> distinctMap(
-  //     new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), STLPoolAllocator<rowgroup::Row::Pointer>(fRm)));
-  std::unique_ptr<TNSDistinctMap_t> distinctMap(new TNSDistinctMap_t(10, TAHasher(this), TAEq(this)));
+  std::unique_ptr<TNSDistinctMap_t> distinctMap(
+      new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), STLPoolAllocator<rowgroup::Row::Pointer>(fRm)));
 
   rgDataOut.reinit(fRowGroupOut);
   fRowGroupOut.setData(&rgDataOut);
@@ -723,13 +715,9 @@ void TupleAnnexStep::finalizeParallelOrderByDistinct()
   // Calculate offset here
   fRowGroupOut.getRow(0, &fRowOut);
 
-  // auto allocSorting = fRm->getAllocator<ordering::OrderByRow>();
   ordering::SortingPQ finalPQ(rowgroup::rgCommonSize, fRm->getAllocator<ordering::OrderByRow>());
-  // ordering::SortingPQ finalPQ(rowgroup::rgCommonSize);
-  // auto allocDistinct = fRm->getAllocator<rowgroup::Row::Pointer>();
-  // std::unique_ptr<TNSDistinctMap_t> distinctMap(
-  //     new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), STLPoolAllocator<rowgroup::Row::Pointer>(fRm)));
-  std::unique_ptr<TNSDistinctMap_t> distinctMap(new TNSDistinctMap_t(10, TAHasher(this), TAEq(this)));
+  std::unique_ptr<TNSDistinctMap_t> distinctMap(
+      new TNSDistinctMap_t(10, TAHasher(this), TAEq(this), STLPoolAllocator<rowgroup::Row::Pointer>(fRm)));
   fRowGroupIn.initRow(&row1);
   fRowGroupIn.initRow(&row2);
 
