@@ -57,19 +57,15 @@ void PoolAllocator::deallocateAll()
 void PoolAllocator::newBlock()
 {
   capacityRemaining = allocSize;
-  std::cout << "PoolAllocator new block" << std::endl;
-
   if (!tmpSpace || mem.size() == 0)
   {
     if (alloc)
     {
-      // std::cout << "PoolAllocator new block with counting alloc" << std::endl;
 
       mem.emplace_back(boost::allocate_shared<PoolAllocatorBufType>(*alloc, allocSize)); 
     }
     else 
     {
-      // std::cout << "PoolAllocator new block w/o counting alloc" << std::endl;
       mem.emplace_back(boost::make_shared<PoolAllocatorBufType>(allocSize));
     }
     nextAlloc = mem.back().get();
@@ -81,17 +77,14 @@ void PoolAllocator::newBlock()
 void* PoolAllocator::allocOOB(uint64_t size)
 {
   OOBMemInfo memInfo;
-  // std::cout << "PoolAllocator allocOOB" << std::endl;
 
   memUsage += size;
   if (alloc)
   {
-    // std::cout << "PoolAllocator allocOOB with counting alloc" << std::endl;
     memInfo.mem = boost::allocate_shared<PoolAllocatorBufType>(*alloc, size);
   }
   else 
   {
-    // std::cout << "PoolAllocator allocOOB w/o counting alloc" << std::endl;
     memInfo.mem = boost::make_shared<PoolAllocatorBufType>(size);
   }
   memInfo.size = size;
