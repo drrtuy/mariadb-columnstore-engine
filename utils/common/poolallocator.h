@@ -33,8 +33,6 @@
 #include <map>
 #include <memory>
 
-#include <iostream>
-
 #include <boost/smart_ptr/allocate_shared_array.hpp>
 
 

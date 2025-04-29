@@ -25,8 +25,6 @@
 #include <boost/smart_ptr/allocate_shared_array.hpp>
 #include <boost/smart_ptr/make_shared_array.hpp>
 
-#include <iostream>
-
 #include "poolallocator.h"
 
 using namespace std;
@@ -36,7 +34,6 @@ namespace utils
 {
 PoolAllocator& PoolAllocator::operator=(const PoolAllocator& v)
 {
-  std::cout << "PoolAllocator copy assignment" << std::endl;
   allocSize = v.allocSize;
   tmpSpace = v.tmpSpace;
   useLock = v.useLock;
@@ -61,7 +58,6 @@ void PoolAllocator::newBlock()
   {
     if (alloc)
     {
-
       mem.emplace_back(boost::allocate_shared<PoolAllocatorBufType>(*alloc, allocSize)); 
     }
     else 
