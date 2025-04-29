@@ -38,7 +38,7 @@ namespace utils
 as the deleter. */
 struct BoostPoolDeallocator
 {
-  inline void operator()(void* ptr){};
+  inline void operator()(void* ptr) {};
 };
 
 /* This is an STL-compliant wrapper for PoolAllocator + an optimization for containers
@@ -62,7 +62,9 @@ class STLPoolAllocator
   };
 
   STLPoolAllocator() throw();
-  STLPoolAllocator(joblist::ResourceManager* rm);
+  STLPoolAllocator(joblist::ResourceManager* rm,
+                   const int64_t checkPointStepSize = allocators::CheckPointStepSize,
+                   const int64_t memoryLimitLowerBound = allocators::MemoryLimitLowerBound);
   STLPoolAllocator(const STLPoolAllocator&) throw();
   STLPoolAllocator(uint32_t capacity) throw();
   template <class U>
@@ -97,17 +99,17 @@ STLPoolAllocator<T>::STLPoolAllocator() throw()
 }
 
 template <class T>
-STLPoolAllocator<T>::STLPoolAllocator(joblist::ResourceManager* rm)
+STLPoolAllocator<T>::STLPoolAllocator(joblist::ResourceManager* rm,
+                                      const int64_t checkPointStepSize,
+                                      const int64_t memoryLimitLowerBound)
 {
-  if (rm) 
+  if (rm)
   {
-    // std::cout << "STLPoolAllocator with RM " << std::endl;
-    auto alloc = rm->getAllocator<PoolAllocatorBufType>(1024);
+    auto alloc = rm->getAllocator<PoolAllocatorBufType>(checkPointStepSize, memoryLimitLowerBound);
     pa.reset(new PoolAllocator(alloc, DEFAULT_SIZE));
   }
   else
   {
-    // std::cout << "STLPoolAllocator w/o RM " << std::endl;
     pa.reset(new PoolAllocator(DEFAULT_SIZE));
   }
 }

@@ -36,8 +36,9 @@ namespace allocators
 // When a sync op hits MemoryLimitLowerBound trying to allocate more memory, it throws.
 // SQL operators or TBPS runtime must catch the exception and act acordingly.
 
-const constexpr int64_t MemoryLimitLowerBound = 500 * 1024 * 1024;  // WIP
-const constexpr int64_t CheckPointStepSize = 100 * 1024 * 1024;     // WIP
+const constexpr int64_t MemoryLimitLowerBound = 500 * 1024 * 1024;
+// Higher values demonstrate slower response to memory limit violations.
+const constexpr int64_t CheckPointStepSize = 1024;
 
 // Custom Allocator that tracks allocated memory using an atomic counter
 template <typename T>

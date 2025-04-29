@@ -59,7 +59,6 @@ class PoolAllocator
    , useLock(_useLock)
    , lock(false)
   {
-    std::cout << "PoolAllocator w/o counting allocator created" << std::endl;
   }
   PoolAllocator(allocators::CountingAllocator<PoolAllocatorBufType> alloc, unsigned windowSize = DEFAULT_WINDOW_SIZE,
                 bool isTmpSpace = false, bool _useLock = false)
@@ -72,7 +71,6 @@ class PoolAllocator
    , lock(false)
    , alloc(alloc)
   {
-    std::cout << "PoolAllocator with counting allocator created" << std::endl;
   }
   PoolAllocator(const PoolAllocator& p)
    : allocSize(p.allocSize)

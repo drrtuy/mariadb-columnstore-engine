@@ -94,9 +94,6 @@ if (WITH_UNITTESTS)
     target_link_libraries(stlpoolallocator ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES})
     gtest_add_tests(TARGET stlpoolallocator TEST_PREFIX columnstore:)
 
-    add_executable(oid_server_return oid-server-return.cpp)
-    target_link_libraries(oid_server_return ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS})
-
     add_executable(comparators_tests comparators-tests.cpp)
     target_link_libraries(comparators_tests ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
     add_test(NAME columnstore:comparators_tests COMMAND comparators_tests)

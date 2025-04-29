@@ -116,94 +116,36 @@ TEST_F(STLPoolAllocatorTest, VectorIntegration)
     vec.shrink_to_fit();
 }
 
-// /**
-//  * Test multithreaded allocation
-//  */
-// TEST_F(STLPoolAllocatorTest, MultithreadedAllocation)
-// {
-//     const int THREAD_COUNT = 4;
-//     const size_t ALLOC_SIZE = 100;
-//     std::vector<std::thread> threads;
-    
-//     Allocator alloc;
-//     uint64_t initialUsage = alloc.getMemUsage();
-    
-//     // Create threads that will allocate memory
-//     for (int i = 0; i < THREAD_COUNT; ++i)
-//     {
-//         threads.emplace_back(
-//             [&alloc]()
-//             {
-//                 std::vector<TestType*, STLPoolAllocator<TestType*>> ptrs(alloc);
-                
-//                 for (size_t j = 0; j < 10; ++j)
-//                 {
-//                     TestType* ptr = alloc.allocate(ALLOC_SIZE);
-//                     for (size_t k = 0; k < ALLOC_SIZE; ++k)
-//                     {
-//                         alloc.construct(ptr + k, static_cast<TestType>(k));
-//                     }
-//                     ptrs.push_back(ptr);
-//                 }
-                
-//                 // Cleanup
-//                 for (auto ptr : ptrs)
-//                 {
-//                     for (size_t k = 0; k < ALLOC_SIZE; ++k)
-//                     {
-//                         alloc.destroy(ptr + k);
-//                     }
-//                     alloc.deallocate(ptr, ALLOC_SIZE);
-//                 }
-//             });
-//     }
-    
-//     // Wait for all threads to complete
-//     for (auto& th : threads)
-//     {
-//         th.join();
-//     }
-    
-//     // Memory usage should be greater than initial due to vector allocations
-//     EXPECT_GT(alloc.getMemUsage(), initialUsage);
-// }
-
 /**
  * Test ResourceManager integration
  */
 TEST_F(STLPoolAllocatorTest, ResourceManagerIntegration)
 {
+    using TestType = int8_t;
+    using Allocator = STLPoolAllocator<TestType>;
+
     joblist::ResourceManager rm(true, nullptr);
     // To set the memory allowance
     rm.setMemory(MemoryAllowance);
-    std::cout << "Memory allowance: " << MemoryAllowance << std::endl;
-
-    Allocator alloc(&rm);
+    Allocator alloc(&rm, 1024, 512);
     
-    std::cout << "Memory available 1 : " << rm.availableMemory() << std::endl;
-    // Basic allocation test with ResourceManager
     TestType* ptr = alloc.allocate(1);
     ASSERT_NE(ptr, nullptr);
-    std::cout << "Memory available 2 : " << rm.availableMemory() << std::endl;
-    
 
     alloc.construct(ptr, 42);
     EXPECT_EQ(*ptr, 42);
     
     alloc.destroy(ptr);
     alloc.deallocate(ptr, 1);
-    std::cout << "Memory available 3 : " << rm.availableMemory() << std::endl;
 
     TestType* ptr2 = alloc.allocate(65537);
     ASSERT_NE(ptr2, nullptr);
     alloc.construct(ptr2, 42);
     EXPECT_EQ(*ptr2, 42);
-    std::cout << "Memory available 4 : " << rm.availableMemory() << std::endl;
 
     
     alloc.destroy(ptr2);
     alloc.deallocate(ptr2, 1);
-    std::cout << "Memory available 5 : " << rm.availableMemory() << std::endl;
 }
 
 /**
