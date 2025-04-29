@@ -45,8 +45,10 @@ std::unique_ptr<HashTable> makeHashMap(size_t bucketCount, ResourceManager* reso
 {
   // auto alloc = resourceManager->getAllocator<T>();
   // return std::unique_ptr<T>(new T(bucketCount, TupleJoiner::hasher(), typename T::key_equal(), alloc));
+  // std::cout << " makeHashMap " << std::endl;
   return std::unique_ptr<HashTable>(new HashTable(bucketCount, TupleJoiner::hasher(),
                                                   typename HashTable::key_equal(),
+                                                  // resourceManager->getAllocator<typename HashTable::value_type>()));
                                                   utils::STLPoolAllocator<typename HashTable::value_type>(resourceManager)));
 }
 
