@@ -419,5 +419,3 @@ extern std::ostream& showOidInDL(std::ostream& strm);
 extern std::ostream& omitOidInDL(std::ostream& strm);
 
 }  // namespace joblist
-
-#endif
