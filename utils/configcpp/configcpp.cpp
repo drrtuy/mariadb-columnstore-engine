@@ -598,6 +598,7 @@ std::string Config::getTempFileDir(Config::TempDirPurpose what)
   {
     case TempDirPurpose::Joins: return prefix.append("joins/");
     case TempDirPurpose::Aggregates: return prefix.append("aggregates/");
+    case TempDirPurpose::Sorting: return prefix.append("sorting/");
   }
   // NOTREACHED
   return {};
