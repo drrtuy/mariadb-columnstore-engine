@@ -7674,7 +7674,6 @@ void buildInToExistsFilter(gp_walk_info& gwi, SELECT_LEX& select_lex)
   }
 }
 
-
 /*@brief  Process SELECT part of a query or sub-query      */
 /***********************************************************
  * DESCRIPTION:
@@ -8182,6 +8181,240 @@ void buildInToExistsFilter(gp_walk_info& gwi, SELECT_LEX& select_lex)
    return 0;
  }
 
+/*@brief  Process ORDER BY part of a query or sub-query      */
+/***********************************************************
+ * DESCRIPTION:
+ *  Processes ORDER BY part of a query or sub-query
+ * RETURNS
+ *  error id as an int
+ ***********************************************************/
+int processOrderBy(SELECT_LEX& select_lex, 
+  gp_walk_info& gwi, 
+  SCSEP& csep, 
+  boost::shared_ptr<CalpontSystemCatalog>& csc,
+  SRCP& minSc,
+  const bool isUnion,
+  const bool unionSel)
+{
+    SQL_I_List<ORDER> order_list = select_lex.order_list;
+    ORDER* ordercol = static_cast<ORDER*>(order_list.first);
+
+    // check if window functions are in order by. InfiniDB process order by list if
+    // window functions are involved, either in order by or projection.
+    for (; ordercol; ordercol = ordercol->next)
+    {
+      if ((*(ordercol->item))->type() == Item::WINDOW_FUNC_ITEM)
+        gwi.hasWindowFunc = true;
+      // XXX: TODO: implement a proper analysis of what we support.
+      // MCOL-2166 Looking for this sorting item in GROUP_BY items list.
+      // Shouldn't look into this if query doesn't have GROUP BY or
+      // aggregations
+      if (select_lex.agg_func_used() && select_lex.group_list.first &&
+          !sortItemIsInGrouping(*ordercol->item, select_lex.group_list.first))
+      {
+        std::ostringstream ostream;
+        std::ostringstream& osr = ostream;
+        getColNameFromItem(osr, *ordercol->item);
+        Message::Args args;
+        args.add(ostream.str());
+        string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NOT_SUPPORTED_GROUPBY_ORDERBY_EXPRESSION, args);
+        gwi.parseErrorText = emsg;
+        setError(gwi.thd, ER_INTERNAL_ERROR, emsg, gwi);
+        return ERR_NOT_SUPPORTED_GROUPBY_ORDERBY_EXPRESSION;
+      }
+    }
+
+    // re-visit the first of ordercol list
+    ordercol = static_cast<ORDER*>(order_list.first);
+
+    for (; ordercol; ordercol = ordercol->next)
+    {
+      ReturnedColumn* rc = NULL;
+
+      if (ordercol->in_field_list && ordercol->counter_used)
+      {
+        rc = gwi.returnedCols[ordercol->counter - 1]->clone();
+        rc->orderPos(ordercol->counter - 1);
+        // can not be optimized off if used in order by with counter.
+        // set with self derived table alias if it's derived table
+        gwi.returnedCols[ordercol->counter - 1]->incRefCount();
+      }
+      else
+      {
+        Item* ord_item = *(ordercol->item);
+
+        // ignore not_used column on order by.
+        if ((ord_item->type() == Item::CONST_ITEM && ord_item->cmp_type() == INT_RESULT) &&
+            ord_item->full_name() && !strcmp(ord_item->full_name(), "Not_used"))
+        {
+          continue;
+        }
+        else if (ord_item->type() == Item::CONST_ITEM && ord_item->cmp_type() == INT_RESULT)
+        {
+          // DRRTUY This section looks useless b/c there is no
+          // way to put constant INT into an ORDER BY list
+          rc = gwi.returnedCols[((Item_int*)ord_item)->val_int() - 1]->clone();
+        }
+        else if (ord_item->type() == Item::SUBSELECT_ITEM)
+        {
+          gwi.fatalParseError = true;
+        }
+        else if ((ord_item->type() == Item::FUNC_ITEM) &&
+                  (((Item_func*)ord_item)->functype() == Item_func::COLLATE_FUNC))
+        {
+          push_warning(gwi.thd, Sql_condition::WARN_LEVEL_NOTE, WARN_OPTION_IGNORED,
+                        "COLLATE is ignored in ColumnStore");
+          continue;
+        }
+        else
+        {
+          rc = buildReturnedColumn(ord_item, gwi, gwi.fatalParseError);
+
+          rc = wrapIntoAggregate(rc, gwi, ord_item);
+        }
+        // @bug5501 try item_ptr if item can not be fixed. For some
+        // weird dml statement state, item can not be fixed but the
+        // infomation is available in item_ptr.
+        if (!rc || gwi.fatalParseError)
+        {
+          Item* item_ptr = ordercol->item_ptr;
+
+          while (item_ptr->type() == Item::REF_ITEM)
+            item_ptr = *(((Item_ref*)item_ptr)->ref);
+
+          rc = buildReturnedColumn(item_ptr, gwi, gwi.fatalParseError);
+        }
+
+        if (!rc)
+        {
+          string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_ORDER_BY);
+          gwi.parseErrorText = emsg;
+          setError(gwi.thd, ER_CHECK_NOT_IMPLEMENTED, emsg, gwi);
+          return ER_CHECK_NOT_IMPLEMENTED;
+        }
+      }
+
+      if (ordercol->direction == ORDER::ORDER_ASC)
+        rc->asc(true);
+      else
+        rc->asc(false);
+
+      gwi.orderByCols.push_back(SRCP(rc));
+    }
+
+    // make sure columnmap, returnedcols and count(*) arg_list are not empty
+    TableMap::iterator tb_iter = gwi.tableMap.begin();
+
+    try
+    {
+      for (; tb_iter != gwi.tableMap.end(); tb_iter++)
+      {
+        if ((*tb_iter).second.first == 1)
+          continue;
+
+        CalpontSystemCatalog::TableAliasName tan = (*tb_iter).first;
+        CalpontSystemCatalog::TableName tn = make_table((*tb_iter).first.schema, (*tb_iter).first.table);
+        SimpleColumn* sc = getSmallestColumn(csc, tn, tan, (*tb_iter).second.second->table, gwi);
+        SRCP srcp(sc);
+        gwi.columnMap.insert(CalpontSelectExecutionPlan::ColumnMap::value_type(sc->columnName(), srcp));
+        (*tb_iter).second.first = 1;
+      }
+    }
+    catch (runtime_error& e)
+    {
+      setError(gwi.thd, ER_INTERNAL_ERROR, e.what(), gwi);
+      return ER_INTERNAL_ERROR;
+    }
+    catch (...)
+    {
+      string emsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);
+      setError(gwi.thd, ER_INTERNAL_ERROR, emsg, gwi);
+      return ER_INTERNAL_ERROR;
+    }
+
+    if (!gwi.count_asterisk_list.empty() || !gwi.no_parm_func_list.empty() || gwi.returnedCols.empty())
+    {
+      // get the smallest column from colmap
+      CalpontSelectExecutionPlan::ColumnMap::const_iterator iter;
+      int minColWidth = 0;
+      CalpontSystemCatalog::ColType ct;
+
+      try
+      {
+        for (iter = gwi.columnMap.begin(); iter != gwi.columnMap.end(); ++iter)
+        {
+          // should always not null
+          SimpleColumn* sc = dynamic_cast<SimpleColumn*>(iter->second.get());
+
+          if (sc && !(sc->joinInfo() & JOIN_CORRELATED))
+          {
+            ct = csc->colType(sc->oid());
+
+            if (minColWidth == 0)
+            {
+              minColWidth = ct.colWidth;
+              minSc = iter->second;
+            }
+            else if (ct.colWidth < minColWidth)
+            {
+              minColWidth = ct.colWidth;
+              minSc = iter->second;
+            }
+          }
+        }
+      }
+      catch (...)
+      {
+        string emsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);
+        setError(gwi.thd, ER_INTERNAL_ERROR, emsg, gwi);
+        return ER_INTERNAL_ERROR;
+      }
+
+      if (gwi.returnedCols.empty() && gwi.additionalRetCols.empty() && minSc)
+        gwi.returnedCols.push_back(minSc);
+    }
+
+    // ORDER BY translation part
+    if (!isUnion && !gwi.hasWindowFunc && gwi.subSelectType == CalpontSelectExecutionPlan::MAIN_SELECT)
+    {
+      {
+        if (unionSel)
+          order_list = select_lex.master_unit()->global_parameters()->order_list;
+
+        ordercol = static_cast<ORDER*>(order_list.first);
+
+        for (; ordercol; ordercol = ordercol->next)
+        {
+          Item* ord_item = *(ordercol->item);
+
+          if (ord_item->name.length)
+          {
+            // for union order by 1 case. For unknown reason, it doesn't show in_field_list
+            if (ord_item->type() == Item::CONST_ITEM && ord_item->cmp_type() == INT_RESULT)
+            {
+            }
+            else if (ord_item->type() == Item::SUBSELECT_ITEM)
+            {
+            }
+            else
+            {
+            }
+          }
+        }
+      }
+
+      if (gwi.orderByCols.size())  // has order by
+      {
+        csep->hasOrderBy(true);
+        // To activate LimitedOrderBy
+        csep->orderByThreads(get_orderby_threads(gwi.thd));
+        csep->specHandlerProcessed(true);
+      }
+    }
+
+    return 0;
+}
+ 
 /*@brief  Translates SELECT_LEX into CSEP                  */
 /***********************************************************
  * DESCRIPTION:
@@ -8709,238 +8942,20 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
     }
   }
 
-  // ORDER BY processing
+  if ((rc = processOrderBy(select_lex, gwi, csep, csc, minSc, isUnion, unionSel))) 
   {
-    SQL_I_List<ORDER> order_list = select_lex.order_list;
-    ORDER* ordercol = static_cast<ORDER*>(order_list.first);
+    CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
+    return rc;
+  }
 
-    // check if window functions are in order by. InfiniDB process order by list if
-    // window functions are involved, either in order by or projection.
-    for (; ordercol; ordercol = ordercol->next)
-    {
-      if ((*(ordercol->item))->type() == Item::WINDOW_FUNC_ITEM)
-        gwi.hasWindowFunc = true;
-      // XXX: TODO: implement a proper analysis of what we support.
-      // MCOL-2166 Looking for this sorting item in GROUP_BY items list.
-      // Shouldn't look into this if query doesn't have GROUP BY or
-      // aggregations
-      if (select_lex.agg_func_used() && select_lex.group_list.first &&
-          !sortItemIsInGrouping(*ordercol->item, select_lex.group_list.first))
-      {
-        std::ostringstream ostream;
-        std::ostringstream& osr = ostream;
-        getColNameFromItem(osr, *ordercol->item);
-        Message::Args args;
-        args.add(ostream.str());
-        string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NOT_SUPPORTED_GROUPBY_ORDERBY_EXPRESSION, args);
-        gwi.parseErrorText = emsg;
-        setError(gwi.thd, ER_INTERNAL_ERROR, emsg, gwi);
-        return ERR_NOT_SUPPORTED_GROUPBY_ORDERBY_EXPRESSION;
-      }
-    }
+  // json dictionary for debug and testing options
+  csep->pron(get_pron(gwi.thd));
 
-    // re-visit the first of ordercol list
-    ordercol = static_cast<ORDER*>(order_list.first);
-
-    {
-      for (; ordercol; ordercol = ordercol->next)
-      {
-        ReturnedColumn* rc = NULL;
-
-        if (ordercol->in_field_list && ordercol->counter_used)
-        {
-          rc = gwi.returnedCols[ordercol->counter - 1]->clone();
-          rc->orderPos(ordercol->counter - 1);
-          // can not be optimized off if used in order by with counter.
-          // set with self derived table alias if it's derived table
-          gwi.returnedCols[ordercol->counter - 1]->incRefCount();
-        }
-        else
-        {
-          Item* ord_item = *(ordercol->item);
-
-          // ignore not_used column on order by.
-          if ((ord_item->type() == Item::CONST_ITEM && ord_item->cmp_type() == INT_RESULT) &&
-              ord_item->full_name() && !strcmp(ord_item->full_name(), "Not_used"))
-          {
-            continue;
-          }
-          else if (ord_item->type() == Item::CONST_ITEM && ord_item->cmp_type() == INT_RESULT)
-          {
-            // DRRTUY This section looks useless b/c there is no
-            // way to put constant INT into an ORDER BY list
-            rc = gwi.returnedCols[((Item_int*)ord_item)->val_int() - 1]->clone();
-          }
-          else if (ord_item->type() == Item::SUBSELECT_ITEM)
-          {
-            gwi.fatalParseError = true;
-          }
-          else if ((ord_item->type() == Item::FUNC_ITEM) &&
-                   (((Item_func*)ord_item)->functype() == Item_func::COLLATE_FUNC))
-          {
-            push_warning(gwi.thd, Sql_condition::WARN_LEVEL_NOTE, WARN_OPTION_IGNORED,
-                         "COLLATE is ignored in ColumnStore");
-            continue;
-          }
-          else
-          {
-            rc = buildReturnedColumn(ord_item, gwi, gwi.fatalParseError);
-
-            rc = wrapIntoAggregate(rc, gwi, ord_item);
-          }
-          // @bug5501 try item_ptr if item can not be fixed. For some
-          // weird dml statement state, item can not be fixed but the
-          // infomation is available in item_ptr.
-          if (!rc || gwi.fatalParseError)
-          {
-            Item* item_ptr = ordercol->item_ptr;
-
-            while (item_ptr->type() == Item::REF_ITEM)
-              item_ptr = *(((Item_ref*)item_ptr)->ref);
-
-            rc = buildReturnedColumn(item_ptr, gwi, gwi.fatalParseError);
-          }
-
-          if (!rc)
-          {
-            string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_ORDER_BY);
-            gwi.parseErrorText = emsg;
-            setError(gwi.thd, ER_CHECK_NOT_IMPLEMENTED, emsg, gwi);
-            return ER_CHECK_NOT_IMPLEMENTED;
-          }
-        }
-
-        if (ordercol->direction == ORDER::ORDER_ASC)
-          rc->asc(true);
-        else
-          rc->asc(false);
-
-        gwi.orderByCols.push_back(SRCP(rc));
-      }
-    }
-
-    // make sure columnmap, returnedcols and count(*) arg_list are not empty
-    TableMap::iterator tb_iter = gwi.tableMap.begin();
-
-    try
-    {
-      for (; tb_iter != gwi.tableMap.end(); tb_iter++)
-      {
-        if ((*tb_iter).second.first == 1)
-          continue;
-
-        CalpontSystemCatalog::TableAliasName tan = (*tb_iter).first;
-        CalpontSystemCatalog::TableName tn = make_table((*tb_iter).first.schema, (*tb_iter).first.table);
-        SimpleColumn* sc = getSmallestColumn(csc, tn, tan, (*tb_iter).second.second->table, gwi);
-        SRCP srcp(sc);
-        gwi.columnMap.insert(CalpontSelectExecutionPlan::ColumnMap::value_type(sc->columnName(), srcp));
-        (*tb_iter).second.first = 1;
-      }
-    }
-    catch (runtime_error& e)
-    {
-      setError(gwi.thd, ER_INTERNAL_ERROR, e.what(), gwi);
-      CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
-      return ER_INTERNAL_ERROR;
-    }
-    catch (...)
-    {
-      string emsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);
-      setError(gwi.thd, ER_INTERNAL_ERROR, emsg, gwi);
-      CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
-      return ER_INTERNAL_ERROR;
-    }
-
-    if (!gwi.count_asterisk_list.empty() || !gwi.no_parm_func_list.empty() || gwi.returnedCols.empty())
-    {
-      // get the smallest column from colmap
-      CalpontSelectExecutionPlan::ColumnMap::const_iterator iter;
-      int minColWidth = 0;
-      CalpontSystemCatalog::ColType ct;
-
-      try
-      {
-        for (iter = gwi.columnMap.begin(); iter != gwi.columnMap.end(); ++iter)
-        {
-          // should always not null
-          SimpleColumn* sc = dynamic_cast<SimpleColumn*>(iter->second.get());
-
-          if (sc && !(sc->joinInfo() & JOIN_CORRELATED))
-          {
-            ct = csc->colType(sc->oid());
-
-            if (minColWidth == 0)
-            {
-              minColWidth = ct.colWidth;
-              minSc = iter->second;
-            }
-            else if (ct.colWidth < minColWidth)
-            {
-              minColWidth = ct.colWidth;
-              minSc = iter->second;
-            }
-          }
-        }
-      }
-      catch (...)
-      {
-        string emsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);
-        setError(gwi.thd, ER_INTERNAL_ERROR, emsg, gwi);
-        CalpontSystemCatalog::removeCalpontSystemCatalog(sessionID);
-        return ER_INTERNAL_ERROR;
-      }
-
-      if (gwi.returnedCols.empty() && gwi.additionalRetCols.empty() && minSc)
-        gwi.returnedCols.push_back(minSc);
-    }
-
-    // ORDER BY translation part
-    if (!isUnion && !gwi.hasWindowFunc && gwi.subSelectType == CalpontSelectExecutionPlan::MAIN_SELECT)
-    {
-      {
-        if (unionSel)
-          order_list = select_lex.master_unit()->global_parameters()->order_list;
-
-        ordercol = static_cast<ORDER*>(order_list.first);
-
-        for (; ordercol; ordercol = ordercol->next)
-        {
-          Item* ord_item = *(ordercol->item);
-
-          if (ord_item->name.length)
-          {
-            // for union order by 1 case. For unknown reason, it doesn't show in_field_list
-            if (ord_item->type() == Item::CONST_ITEM && ord_item->cmp_type() == INT_RESULT)
-            {
-            }
-            else if (ord_item->type() == Item::SUBSELECT_ITEM)
-            {
-            }
-            else
-            {
-            }
-          }
-        }
-      }
-
-      if (gwi.orderByCols.size())  // has order by
-      {
-        csep->hasOrderBy(true);
-        // To activate LimitedOrderBy
-        csep->orderByThreads(get_orderby_threads(gwi.thd));
-        csep->specHandlerProcessed(true);
-      }
-    }
-
-    // json dictionary for debug and testing options
-    csep->pron(get_pron(gwi.thd));
-
-    // We don't currently support limit with correlated subquery
-    if ((rc = processLimitAndOffset(select_lex, gwi, csep, unionSel, isUnion, isSelectHandlerTop)))
-    {
-      return rc;
-    }
-  }  // ORDER BY end
+  // We don't currently support limit with correlated subquery
+  if ((rc = processLimitAndOffset(select_lex, gwi, csep, unionSel, isUnion, isSelectHandlerTop)))
+  {
+    return rc;
+  }
 
   if (select_lex.options & SELECT_DISTINCT)
     csep->distinct(true);
@@ -9017,7 +9032,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
   gwi.select_lex = originalSelectLex;
   // append additionalRetCols to returnedCols
   gwi.returnedCols.insert(gwi.returnedCols.begin(), gwi.additionalRetCols.begin(),
-                          gwi.additionalRetCols.end());
+                          gwi.additionalRetCols.end(
+));
 
   csep->groupByCols(gwi.groupByCols);
   csep->withRollup(withRollup);
