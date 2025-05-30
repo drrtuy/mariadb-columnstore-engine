@@ -631,9 +631,6 @@ local Pipeline(branch, platform, event, arch="amd64", server="10.6-enterprise", 
              volumes: [pipeline._volumes.mdb],
              environment: {
                DEBIAN_FRONTEND: "noninteractive",
-               DEB_BUILD_OPTIONS: "parallel=4",
-               DH_BUILD_DDEBS: "1",
-               BUILDPACKAGE_FLAGS: "-b",  // Save time and produce only binary packages, not source
                AWS_ACCESS_KEY_ID: {
                  from_secret: "aws_access_key_id",
                },
@@ -656,7 +653,7 @@ local Pipeline(branch, platform, event, arch="amd64", server="10.6-enterprise", 
                         'bash -c "set -o pipefail && bash /mdb/' + builddir + "/storage/columnstore/columnstore/build/bootstrap_mcs.sh " +
                          "--build-type RelWithDebInfo " +
                          "--distro " + platform + " " +
-                         "--build-packages --sccache " +
+                         "--build-packages --install-deps --sccache " +
                          " " + customBootstrapParams +
                          " " + customBootstrapParamsForExisitingPipelines(platform) + " | " +
                          "/mdb/" + builddir + "/storage/columnstore/columnstore/build/ansi2txt.sh " +
