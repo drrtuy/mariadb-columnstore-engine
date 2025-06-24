@@ -20,6 +20,7 @@ from cmapi_server.constants import (
     CMAPI_CONF_PATH, CMAPI_SINGLE_NODE_XML, DEFAULT_MCS_CONF_PATH, LOCALHOSTS,
     MCS_DATA_PATH,
 )
+from cmapi_server.managers.network import NetworkManager
 from mcs_node_control.models.node_config import NodeConfig
 
 
@@ -937,11 +938,11 @@ def _add_Module_entries(root, node):
     '''
 
     # XXXPAT: No guarantee these are the values used in the rest of the system.
-    # This will work best with a simple network configuration where there is 1 IP addr
-    # and 1 host name for a node.
-    ip4 = socket.gethostbyname(node)
+    # TODO: what should we do with complicated network configs where node has
+    #       several ips and\or several hostnames
+    ip4 = NetworkManager.get_ips()[0]
     if ip4 == node:   # node is an IP addr
-        node_name = socket.gethostbyaddr(node)[0]
+        node_name = NetworkManager.get_hostname(ip4)
     else:
         node_name = node   # node is a hostname
 
