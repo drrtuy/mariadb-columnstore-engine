@@ -49,8 +49,12 @@ include(compiler_flags)
 include(misc)
 include(cpack_manage)
 
+add_subdirectory(dbcon/mysql)
+if(NOT TARGET columnstore)
+    return()
+endif()
+
 set(COMPONENTS
-    dbcon/mysql
     utils
     oam/oamcpp
     dbcon/execplan
