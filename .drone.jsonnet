@@ -4,27 +4,21 @@ local events = ["pull_request", "cron"];
 local current_branch = "stable-23.10";
 
 local servers = {
-  "stable-23.10": ["10.6-enterprise"],
+  [current_branch]: ["10.6-enterprise"],
 };
 
 local platforms = {
-  "stable-23.10": ["rockylinux:8", "rockylinux:9", "debian:12", "ubuntu:22.04", "ubuntu:24.04"],
+  [current_branch]: ["rockylinux:8", "rockylinux:9", "debian:12", "ubuntu:22.04", "ubuntu:24.04"],
 };
 
 local platforms_arm = {
-  "stable-23.10": ["rockylinux:8", "rockylinux:9", "debian:12", "ubuntu:22.04", "ubuntu:24.04"],
+  [current_branch]: ["rockylinux:8", "rockylinux:9", "debian:12", "ubuntu:22.04", "ubuntu:24.04"],
 };
 
+local builddir = "verylongdirnameforverystrangecpackbehavior";
 local customEnvCommandsMap = {
-  // 'clang-18': ['apt install -y clang-18', 'export CC=/usr/bin/clang-18', 'export CXX=/usr/bin/clang++-18'],
-  "clang-20": [
-    "apt-get clean && apt-get update",
-    "apt-get install -y wget curl lsb-release software-properties-common gnupg",
-    "wget https://apt.llvm.org/llvm.sh",
-    "bash llvm.sh 20",
-    "export CC=/usr/bin/clang",
-    "export CXX=/usr/bin/clang++",
-  ],
+  // 'clang-18': ["bash /mdb/" + builddir + "/storage/columnstore/columnstore/build/install_clang_deb.sh 18"],
+  "clang-20": ["bash /mdb/" + builddir + "/storage/columnstore/columnstore/build/install_clang_deb.sh 20"],
 };
 
 local customEnvCommands(envkey, builddir) =
@@ -52,7 +46,6 @@ local customBootstrapParamsForAdditionalPipelinesMap = {
 
 local any_branch = "**";
 
-local builddir = "verylongdirnameforverystrangecpackbehavior";
 
 local mtr_suite_list = "basic,bugfixes";
 local mtr_full_set = "basic,bugfixes,devregression,autopilot,extended,multinode,oracle,1pmonly";
@@ -115,6 +108,7 @@ local Pipeline(branch, platform, event, arch="amd64", server="10.6-enterprise", 
     name: "publish " + step_prefix,
     depends_on: [std.strReplace(step_prefix, " latest", ""), "createrepo"],
     image: "amazon/aws-cli:2.22.30",
+    volumes: [pipeline._volumes.mdb],
     when: {
       status: ["success", "failure"],
     },
@@ -132,7 +126,21 @@ local Pipeline(branch, platform, event, arch="amd64", server="10.6-enterprise", 
       "sleep 10",
       "ls -lR " + result,
 
-      "aws s3 sync " + result + "/" + " s3://cspkg/" + branchp + eventp + "/" + server + "/" + arch + "/" + result + " --only-show-errors --debug",
+     //clean old versions of .deb/.rpm files
+     "source /mdb/" + builddir + "/storage/columnstore/columnstore/VERSION && " +
+     "CURRENT_VERSION=${COLUMNSTORE_VERSION_MAJOR}.${COLUMNSTORE_VERSION_MINOR}.${COLUMNSTORE_VERSION_PATCH} && " +
+     "aws s3 rm s3://cspkg/" + branchp + eventp + "/" + server + "/" + arch + "/" + result + "/ " +
+     "--recursive " +
+     "--exclude \"*\" " +
+     // include only debs/rpms with columnstore in names
+     "--include \"*columnstore*.deb\" " +
+     "--include \"*columnstore*.rpm\" " +
+     // but do not delete the ones matching CURRENT_VERSION
+     "--exclude \"*${CURRENT_VERSION}*.deb\" " +
+     "--exclude \"*${CURRENT_VERSION}*.rpm\" " +
+     "--only-show-errors",
+
+      "aws s3 sync " + result + "/" + " s3://cspkg/" + branchp + eventp + "/" + server + "/" + arch + "/" + result + " --only-show-errors",
       'echo "Data uploaded to: ' + publish_pkg_url + '"',
       make_clickable_link(publish_pkg_url),
     ],
@@ -504,7 +512,7 @@ local Pipeline(branch, platform, event, arch="amd64", server="10.6-enterprise", 
                SCCACHE_BUCKET: "cs-sccache",
                SCCACHE_REGION: "us-east-1",
                SCCACHE_S3_USE_SSL: "true",
-               SCCACHE_S3_KEY_PREFIX: result + branch + server + arch + "${DRONE_PULL_REQUEST}",
+               SCCACHE_S3_KEY_PREFIX: result + branch + server + arch,
              },
              commands: [
                          "mkdir /mdb/" + builddir + "/" + result,
@@ -514,6 +522,7 @@ local Pipeline(branch, platform, event, arch="amd64", server="10.6-enterprise", 
                         'bash -c "set -o pipefail && bash /mdb/' + builddir + "/storage/columnstore/columnstore/build/bootstrap_mcs.sh " +
                          "--build-type RelWithDebInfo " +
                          "--distro " + platform + " " +
+                         "--build-path " + "/mdb/" + builddir + "/builddir " +
                          "--build-packages --install-deps --sccache" +
                          " " + customBootstrapParams +
                          " " + customBootstrapParamsForExisitingPipelines(platform) + " | " +
