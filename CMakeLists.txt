@@ -1,3 +1,7 @@
+if("NO" STREQUAL "${PLUGIN_COLUMNSTORE}" OR NOT DEFINED PLUGIN_COLUMNSTORE)
+    return()
+endif()
+
 cmake_minimum_required(VERSION 3.13)
 
 project(Columnstore)
