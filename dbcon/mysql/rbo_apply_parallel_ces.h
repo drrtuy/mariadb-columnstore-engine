@@ -58,6 +58,6 @@ using NewTableAliasAndColumnPosCounter = std::pair<string, size_t>;
 using TableAliasMap = std::map<execplan::CalpontSystemCatalog::TableAliasName,
                                NewTableAliasAndColumnPosCounter, TableAliasLessThan>;
 
-bool parallelCESFilter(execplan::CalpontSelectExecutionPlan& csep);
+bool parallelCESFilter(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
 bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
-}
+}  // namespace optimizer

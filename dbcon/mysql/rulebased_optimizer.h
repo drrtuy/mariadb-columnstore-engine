@@ -44,7 +44,7 @@ public:
 struct Rule
 {
   // returns true if rule may be applied
-  using RuleApplierFilter = bool (*)(execplan::CalpontSelectExecutionPlan&);
+  using RuleApplierFilter = bool (*)(execplan::CalpontSelectExecutionPlan&, RBOptimizerContext&);
   // returns true if rule was applied
   using RuleApplier = bool (*)(execplan::CalpontSelectExecutionPlan&, RBOptimizerContext&);
 

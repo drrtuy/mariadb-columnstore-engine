@@ -130,7 +130,7 @@ bool Rule::walk(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimiz
 
     // TODO add walking nested subselect in projection. See CSEP::fSelectSubList
 
-    if (mayApply(*current))
+    if (mayApply(*current, ctx))
     {
       rewrite |= applyRule(*current, ctx);
       ++ctx.uniqueId;
