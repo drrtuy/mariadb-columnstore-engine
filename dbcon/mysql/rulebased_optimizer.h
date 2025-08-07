@@ -32,10 +32,11 @@ namespace optimizer {
 class RBOptimizerContext {
 public:
   RBOptimizerContext() = delete;
-  RBOptimizerContext(cal_impl_if::gp_walk_info& walk_info) : gwi(walk_info) {}
+  RBOptimizerContext(cal_impl_if::gp_walk_info& walk_info, THD& thd) : gwi(walk_info), thd(thd) {}
   // gwi lifetime should be longer than optimizer context. 
   // In plugin runtime this is always true.
   cal_impl_if::gp_walk_info& gwi;
+  THD& thd;
   uint64_t uniqueId {0};
 };
 
