@@ -50,9 +50,17 @@ bool optimizeCSEPWithRules(execplan::CalpontSelectExecutionPlan& root, const std
 // high level API call for optimizer
 bool optimizeCSEP(execplan::CalpontSelectExecutionPlan& root, optimizer::RBOptimizerContext& ctx)
 {
-  optimizer::Rule parallelCES{"parallelCES", optimizer::matchParallelCES, optimizer::applyParallelCES};
+  std::vector<optimizer::Rule> rules;
 
-  std::vector<optimizer::Rule> rules = {parallelCES};
+  if (get_unstable_optimizer(&ctx.thd))
+  {
+    optimizer::Rule parallelCES{"parallelCES", optimizer::matchParallelCES, optimizer::applyParallelCES};
+    rules.push_back(parallelCES);
+  }
+
+  optimizer::Rule predicatePushdown{"predicatePushdown", optimizer::matchParallelCES,
+                                    optimizer::applyParallelCES};
+  rules.push_back(predicatePushdown);
 
   return optimizeCSEPWithRules(root, rules, ctx);
 }
@@ -85,6 +93,7 @@ bool Rule::walk(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimiz
     execplan::CalpontSelectExecutionPlan* current = planStack.top();
     planStack.pop();
 
+    // Walk nested derived
     for (auto& table : current->derivedTableList())
     {
       auto* csepPtr = dynamic_cast<execplan::CalpontSelectExecutionPlan*>(table.get());
@@ -94,6 +103,7 @@ bool Rule::walk(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimiz
       }
     }
 
+    // Walk nested UNION UNITS
     for (auto& unionUnit : current->unionVec())
     {
       auto* unionUnitPtr = dynamic_cast<execplan::CalpontSelectExecutionPlan*>(unionUnit.get());
@@ -102,6 +112,18 @@ bool Rule::walk(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimiz
         planStack.push(unionUnitPtr);
       }
     }
+
+    // Walk nested subselect in filters, e.g. SEMI-JOIN
+    for (auto& subselect : csep.subSelectList())
+    {
+      auto* subselectPtr = dynamic_cast<execplan::CalpontSelectExecutionPlan*>(subselect.get());
+      if (subselectPtr)
+      {
+        planStack.push(subselectPtr);
+      }
+    }
+
+    // TODO add walking nested subselect in projection. See CSEP::fSelectSubList
 
     if (matchRule(*current))
     {
