@@ -55,11 +55,11 @@ bool optimizeCSEP(execplan::CalpontSelectExecutionPlan& root, optimizer::RBOptim
 
   if (get_unstable_optimizer(&ctx.thd))
   {
-    optimizer::Rule parallelCES{"parallelCES", optimizer::parallelCESFilter, optimizer::applyParallelCES};
+    optimizer::Rule parallelCES{"parallel_ces", optimizer::parallelCESFilter, optimizer::applyParallelCES};
     rules.push_back(parallelCES);
   }
 
-  optimizer::Rule predicatePushdown{"predicatePushdown", optimizer::predicatePushdownFilter,
+  optimizer::Rule predicatePushdown{"predicate_pushdown", optimizer::predicatePushdownFilter,
                                     optimizer::applyPredicatePushdown};
   rules.push_back(predicatePushdown);
 
@@ -76,6 +76,10 @@ bool Rule::apply(execplan::CalpontSelectExecutionPlan& root, optimizer::RBOptimi
   {
     changedThisRound = walk(root, ctx);
     hasBeenApplied |= changedThisRound;
+    if (ctx.logRules)
+    {
+      std::cout << "MCS RBO: " << name << " has been applied this round." << std::endl;
+    }
   } while (changedThisRound && !applyOnlyOnce);
 
   return hasBeenApplied;
