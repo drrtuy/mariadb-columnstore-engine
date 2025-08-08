@@ -1579,6 +1579,8 @@ uint64_t CalpontSystemCatalog::nextAutoIncrValue(TableName aTableName, int lower
     throw;
   }
 
+  std::cout << "nextAutoIncrValue: after tableInfo tbInfo.tablewithautoincr " << tbInfo.tablewithautoincr << std::endl;
+
   if (tbInfo.tablewithautoincr == NO_AUTOINCRCOL)
     return AUTOINCR_SATURATED;
 
@@ -1653,6 +1655,7 @@ uint64_t CalpontSystemCatalog::nextAutoIncrValue(TableName aTableName, int lower
   }
   catch (runtime_error& e)
   {
+    std::cout << "nextAutoIncrValue: exception calling getSysData " << std::endl;
     throw runtime_error(e.what());
   }
 
@@ -1664,6 +1667,7 @@ uint64_t CalpontSystemCatalog::nextAutoIncrValue(TableName aTableName, int lower
     if ((*it)->ColumnOID() == oid[3])
     {
       nextVal = static_cast<uint64_t>(((*it)->GetData(0)));
+      std::cout << "nextAutoIncrValue: found nextvalue " << nextVal << std::endl;
     }
   }
 

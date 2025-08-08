@@ -682,9 +682,11 @@ extern "C"
     {
       std::string msg("No such table found during autincrement");
       setError(thd, ER_INTERNAL_ERROR, msg);
+      std::cout << "mcslastinsertid: exception calling CSC thus nextVal " << nextVal << std::endl;
       return nextVal;
     }
 
+    std::cout << "mcslastinsertid: after CSC call nextVal " << nextVal << std::endl;
     if (nextVal == AUTOINCR_SATURATED)
     {
       setError(thd, ER_INTERNAL_ERROR, IDBErrorInfo::instance()->errorMsg(ERR_EXCEED_LIMIT));
