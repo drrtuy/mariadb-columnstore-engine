@@ -25,6 +25,6 @@
 #include "rulebased_optimizer.h"
 
 namespace optimizer {
-  bool matchParallelCES(execplan::CalpontSelectExecutionPlan& csep);
-  void applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
+  bool parallelCESFilter(execplan::CalpontSelectExecutionPlan& csep);
+  bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
 }
