@@ -7478,7 +7478,7 @@ int cs_get_select_plan(ha_columnstore_select_handler* handler, THD* thd, SCSEP& 
   derivedTableOptimization(&gwi, csep);
 
   {
-    optimizer::RBOptimizerContext ctx(gwi, *thd);
+    optimizer::RBOptimizerContext ctx(gwi, *thd, csep->traceOn());
     bool csepWasOptimized = optimizer::optimizeCSEP(*csep, ctx);
     if (csep->traceOn() && csepWasOptimized)
     {
