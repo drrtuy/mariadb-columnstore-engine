@@ -31,6 +31,7 @@
 #include "predicateoperator.h"
 #include "simplefilter.h"
 #include "rbo_apply_parallel_ces.h"
+#include "rbo_predicate_pushdown.h"
 
 namespace optimizer
 {
@@ -54,12 +55,12 @@ bool optimizeCSEP(execplan::CalpontSelectExecutionPlan& root, optimizer::RBOptim
 
   if (get_unstable_optimizer(&ctx.thd))
   {
-    optimizer::Rule parallelCES{"parallelCES", optimizer::matchParallelCES, optimizer::applyParallelCES};
+    optimizer::Rule parallelCES{"parallelCES", optimizer::parallelCESFilter, optimizer::applyParallelCES};
     rules.push_back(parallelCES);
   }
 
-  optimizer::Rule predicatePushdown{"predicatePushdown", optimizer::matchParallelCES,
-                                    optimizer::applyParallelCES};
+  optimizer::Rule predicatePushdown{"predicatePushdown", optimizer::predicatePushdownFilter,
+                                    optimizer::applyPredicatePushdown};
   rules.push_back(predicatePushdown);
 
   return optimizeCSEPWithRules(root, rules, ctx);
@@ -114,7 +115,7 @@ bool Rule::walk(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimiz
     }
 
     // Walk nested subselect in filters, e.g. SEMI-JOIN
-    for (auto& subselect : csep.subSelectList())
+    for (auto& subselect : current->subSelectList())
     {
       auto* subselectPtr = dynamic_cast<execplan::CalpontSelectExecutionPlan*>(subselect.get());
       if (subselectPtr)
@@ -125,11 +126,10 @@ bool Rule::walk(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimiz
 
     // TODO add walking nested subselect in projection. See CSEP::fSelectSubList
 
-    if (matchRule(*current))
+    if (mayApply(*current))
     {
-      applyRule(*current, ctx);
+      rewrite = applyRule(*current, ctx);
       ++ctx.uniqueId;
-      rewrite = true;
     }
   }
 

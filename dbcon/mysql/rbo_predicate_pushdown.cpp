@@ -29,13 +29,16 @@
 namespace optimizer
 {
 
-bool matchPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep)
+   using DerivedToFiltersMap = std::map<std::string, execplan::ParseTree*>;
+
+bool predicatePushdownFilter(execplan::CalpontSelectExecutionPlan& csep)
 {
   // The original rule match contains questionable decision to filter out
   // queries that contains any UNION UNIT with only derived tables.
   // See ha_from_sub.cpp before MCS 23.10.7 for more details and @bug6156.
   // All tables are derived thus nothing to optimize.
-  return !csep.tableList().empty();
+  return !
+  csep.tableList().empty();
 }
 
 
@@ -73,7 +76,7 @@ void setDerivedTable(execplan::ParseTree* n)
   }
 }
 
-execplan::ParseTree* setDerivedFilter(cal_impl_if::gp_walk_info* gwip, execplan::ParseTree*& n, map<string, execplan::ParseTree*>& filterMap,
+execplan::ParseTree* setDerivedFilter(cal_impl_if::gp_walk_info* gwip, execplan::ParseTree*& n, DerivedToFiltersMap& filterMap,
                             const execplan::CalpontSelectExecutionPlan::SelectList& derivedTbList)
 {
   if (!(n->derivedTable().empty()))
@@ -99,11 +102,11 @@ execplan::ParseTree* setDerivedFilter(cal_impl_if::gp_walk_info* gwip, execplan:
 
     // 2. push the filter to the derived table filter stack, or 'and' with
     // the filters in the stack
-    map<string, execplan::ParseTree*>::iterator mapIter = filterMap.find(n->derivedTable());
+    auto mapIter = filterMap.find(n->derivedTable());
 
     if (mapIter == filterMap.end())
     {
-      filterMap.insert(pair<string, execplan::ParseTree*>(n->derivedTable(), n));
+      filterMap.insert({n->derivedTable(), n});
     }
     else
     {
@@ -141,7 +144,7 @@ execplan::ParseTree* setDerivedFilter(cal_impl_if::gp_walk_info* gwip, execplan:
   return n;
 }
 
-void applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, RBOptimizerContext& ctx)
+bool applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, RBOptimizerContext& ctx)
 {
   /*
    * @bug5635. Move filters that only belongs to a derived table to inside the derived table.
@@ -158,8 +161,9 @@ void applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, RBOptimi
    * stacked filter needs to be reset (not null)
    */
    execplan::ParseTree* pt = csep.filters();
-   map<string, execplan::ParseTree*> derivedTbFilterMap;
+   DerivedToFiltersMap derivedTbFilterMap;
    auto& derivedTbList = csep.derivedTableList();
+   bool hasBeenApplied = false;
 
    if (pt)
    {
@@ -171,13 +175,11 @@ void applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, RBOptimi
    // AND the filters of individual stack to the derived table filter tree
    // @todo union filters.
    // @todo outer join complication
-   map<string, execplan::ParseTree*>::iterator mapIt;
- 
    for (uint i = 0; i < derivedTbList.size(); i++)
    {
      execplan::CalpontSelectExecutionPlan* plan = dynamic_cast<execplan::CalpontSelectExecutionPlan*>(derivedTbList[i].get());
      execplan::CalpontSelectExecutionPlan::ReturnedColumnList derivedColList = plan->returnedCols();
-     mapIt = derivedTbFilterMap.find(plan->derivedTbAlias());
+     auto mapIt = derivedTbFilterMap.find(plan->derivedTbAlias());
  
      if (mapIt != derivedTbFilterMap.end())
      {
@@ -225,12 +227,17 @@ void applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, RBOptimi
            unionPlan->filters(mainFilterForUnion);
          }
        }
+       hasBeenApplied = true;
      }
    }
  
    // clean derivedTbFilterMap because all the filters are copied
-   for (mapIt = derivedTbFilterMap.begin(); mapIt != derivedTbFilterMap.end(); ++mapIt)
-     delete (*mapIt).second;
+   for (auto mapIt = derivedTbFilterMap.begin(); mapIt != derivedTbFilterMap.end(); ++mapIt)
+   {
+    delete (*mapIt).second;
+   }
+
+  return hasBeenApplied;
 }
 
 }  // namespace optimizer
