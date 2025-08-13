@@ -25,6 +25,6 @@
 #include "rulebased_optimizer.h"
 
 namespace optimizer {
-  bool predicatePushdownFilter(execplan::CalpontSelectExecutionPlan& csep);
+  bool predicatePushdownFilter(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
   bool applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
 }

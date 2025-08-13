@@ -31,14 +31,13 @@ namespace optimizer
 
    using DerivedToFiltersMap = std::map<std::string, execplan::ParseTree*>;
 
-bool predicatePushdownFilter(execplan::CalpontSelectExecutionPlan& csep)
+bool predicatePushdownFilter(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& /*ctx*/)
 {
   // The original rule match contains questionable decision to filter out
   // queries that contains any UNION UNIT with only derived tables.
   // See ha_from_sub.cpp before MCS 23.10.7 for more details and @bug6156.
   // All tables are derived thus nothing to optimize.
-  return !
-  csep.tableList().empty();
+  return !csep.tableList().empty();
 }
 
 
