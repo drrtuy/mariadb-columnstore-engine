@@ -5222,7 +5222,7 @@ void extractColumnStatistics(TABLE_LIST* table_ptr, gp_walk_info& gwi)
         auto* histogram = dynamic_cast<Histogram_json_hb*>(field->read_stats->histogram);
         if (histogram)
         {
-          std::cout << " has stats with " << histogram->buckets.size() << " buckets";
+          std::cout << " has stats with " << histogram->get_json_histogram().size() << " buckets";
           SchemaAndTableName tableName = {field->table->s->db.str, field->table->s->table_name.str};
           auto sc =
               std::unique_ptr<execplan::SimpleColumn>(buildSimpleColumnFromFieldForStatistics(field, gwi));
@@ -7596,12 +7596,11 @@ int cs_get_select_plan(ha_columnstore_select_handler* handler, THD* thd, SCSEP& 
   // Derived table projection list optimization.
   derivedTableOptimization(&gwi, csep);
 
-
   {
     optimizer::RBOptimizerContext ctx(gwi, *thd, csep->traceOn());
     // TODO RBO can crash or fail leaving CSEP in an invalid state, so there must be a valid CSEP copy
     // TBD There is a tradeoff b/w copy per rule and copy per optimizer run.
-    bool csepWasOptimized = optimizer::optimizeCSEP(*csep, ctx);
+    bool csepWasOptimized = optimizer::optimizeCSEP(*csep, ctx, get_unstable_optimizer(&ctx.thd));
     if (csep->traceOn() && csepWasOptimized)
     {
       cerr << "---------------- cs_get_select_plan optimized EXECUTION PLAN ----------------" << endl;
