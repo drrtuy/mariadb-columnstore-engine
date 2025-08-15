@@ -215,6 +215,7 @@ std::optional<details::FilterRangeBounds<T>> populateRangeBounds(Histogram_json_
 {
   details::FilterRangeBounds<T> bounds;
 
+
   // TODO configurable parallel factor via session variable
   // NB now histogram size is the way to control parallel factor with 16 being the maximum
   std::cout << "populateRangeBounds() columnStatistics->buckets.size() "
@@ -341,13 +342,70 @@ execplan::SCSEP createDerivedTableFromTable(execplan::CalpontSelectExecutionPlan
   return derivedSCEP;
 }
 
+void updateScToUseRewrittenDerived(execplan::SimpleColumn* sc, const std::string& newTableAlias,
+                                   const uint32_t colPosition, std::optional<std::string> scAlias)
+{
+  sc->schemaName("");
+
+  sc->tableName(newTableAlias);
+  sc->tableAlias(newTableAlias);
+  sc->derivedTable(newTableAlias);
+
+  sc->colPosition(colPosition);
+
+  if (scAlias)
+  {
+    sc->alias(scAlias.value());
+  }
+}
+
+std::pair<uint32_t, bool> findOrInsertColumnPosition(execplan::SimpleColumn* sc,
+                                                     SCAliasToPosCounterMap& SCAliasToPosCounterMap,
+                                                     const uint32_t colPosition)
+{
+  auto it = SCAliasToPosCounterMap.find(sc->columnName());
+  if (it == SCAliasToPosCounterMap.end())
+  {
+    SCAliasToPosCounterMap.insert({sc->columnName(), colPosition});
+    std::cout << " first case new column in the map colPosition " << SCAliasToPosCounterMap[sc->columnName()]
+              << std::endl;
+    return {colPosition, true};
+  }
+  // else
+  // {
+  //   std::cout << " first case reusing column from the map colPosition "
+  //             << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
+  // }
+  return {it->second, false};
+}
+
+void tryToUpdateScToUseRewrittenDerived(
+    execplan::SimpleColumn* sc, optimizer::TableAliasToNewAliasAndSCPositionsMap& tableAliasToSCPositionsMap)
+{
+  auto tableAliasToSCPositionsIt = tableAliasToSCPositionsMap.find(*sc->singleTable());
+
+  if (tableAliasToSCPositionsIt != tableAliasToSCPositionsMap.end())
+  {
+    auto& [newTableAlias, SCAliasToPosCounterMap, currentColPositionCursorValue] =
+        tableAliasToSCPositionsIt->second;
+    std::cout << " filters map colPosition " << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
+
+    auto [colPosition, isNewColumn] =
+        findOrInsertColumnPosition(sc, SCAliasToPosCounterMap, currentColPositionCursorValue);
+    if (isNewColumn)
+    {
+      ++currentColPositionCursorValue;
+    }
+    updateScToUseRewrittenDerived(sc, newTableAlias, colPosition, std::nullopt);
+  }
+}
+
 bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx)
 {
   auto tables = csep.tableList();
   execplan::CalpontSelectExecutionPlan::TableList newTableList;
   // TODO support CSEPs with derived tables
   execplan::CalpontSelectExecutionPlan::SelectList newDerivedTableList;
-  optimizer::TableAliasMap tableAliasMap;
   bool ruleHasBeenApplied = false;
   optimizer::TableAliasToNewAliasAndSCPositionsMap tableAliasToSCPositionsMap;
 
@@ -363,7 +421,6 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
     {
       std::string tableAlias = optimizer::RewrittenSubTableAliasPrefix + table.schema + "_" + table.table +
                                "_" + std::to_string(ctx.uniqueId);
-      tableAliasMap.insert({table, {tableAlias, 0}});
       tableAliasToSCPositionsMap.insert({table, {tableAlias, {}, 0}});
       execplan::CalpontSystemCatalog::TableAliasName tn = execplan::make_aliasview("", "", tableAlias, "");
       newTableList.push_back(tn);
@@ -391,43 +448,30 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
       {
         std::cout << "RC table schema " << sameTableAliasOpt->schema << " table " << sameTableAliasOpt->table
                   << " alias " << sameTableAliasOpt->alias << std::endl;
-        auto tableAliasIt = tableAliasMap.find(*sameTableAliasOpt);
         auto tableAliasToSCPositionsIt = tableAliasToSCPositionsMap.find(*sameTableAliasOpt);
-        if (tableAliasIt != tableAliasMap.end())
+        if (tableAliasToSCPositionsIt != tableAliasToSCPositionsMap.end())
         {
           std::cout << "Replacing RC with new SC" << std::endl;
           // add new SC
-          auto& [newTableAlias, colPosition] = tableAliasIt->second;
           auto newSC = boost::make_shared<execplan::SimpleColumn>(*rc, rc->sessionID());
-          newSC->schemaName("");
-          newSC->tableAlias(newTableAlias);
-          newSC->tableAlias(newTableAlias);
-          newSC->alias(rc->alias());
 
           auto* sc = dynamic_cast<execplan::SimpleColumn*>(rc.get());
+          auto& [newTableAlias, SCAliasToPosCounterMap, currentColPositionCursorValue] =
+              tableAliasToSCPositionsIt->second;
           if (sc)
           {
-            auto& [unused, SCAliasToPosCounterMap, currentColPosition] = tableAliasToSCPositionsIt->second;
-            auto it = SCAliasToPosCounterMap.find(sc->columnName());
-            if (it == SCAliasToPosCounterMap.end())
+            auto [colPosition, isNewColumn] =
+                findOrInsertColumnPosition(sc, SCAliasToPosCounterMap, currentColPositionCursorValue);
+            if (isNewColumn)
             {
-              SCAliasToPosCounterMap.insert({sc->columnName(), currentColPosition++});
-              colPosition++;
-              std::cout << " first case new column in the map colPosition "
-                        << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
+              ++currentColPositionCursorValue;
             }
-            else
-            {
-              std::cout << " first case reusing column from the map colPosition "
-                        << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
-            }
-            assert(SCAliasToPosCounterMap[sc->columnName()] == colPosition - 1);
-            newSC->colPosition(SCAliasToPosCounterMap[sc->columnName()]);
-            sc->derivedTable(newTableAlias);
+            updateScToUseRewrittenDerived(newSC.get(), newTableAlias, colPosition, rc->alias());
           }
           else
           {
-            newSC->colPosition(colPosition++);
+            updateScToUseRewrittenDerived(newSC.get(), newTableAlias, currentColPositionCursorValue++,
+                                          rc->alias());
           }
 
           newReturnedColumns.push_back(newSC);
@@ -445,38 +489,7 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
         rc->setSimpleColumnList();
         for (auto* sc : rc->simpleColumnList())
         {
-          // TODO add method to SC to get table alias
-          auto tableAliasIt = tableAliasMap.find(*sc->singleTable());
-          auto tableAliasToSCPositionsIt = tableAliasToSCPositionsMap.find(*sc->singleTable());
-
-          // Need a method to replace original SCs in the SClist
-          if (tableAliasIt != tableAliasMap.end())
-          {
-            auto& [newTableAlias, colPosition] = tableAliasIt->second;
-            sc->schemaName("");
-            sc->tableName(newTableAlias);
-            sc->tableAlias(newTableAlias);
-            sc->derivedTable(newTableAlias);
-
-            auto& [unused, SCAliasToPosCounterMap, currentColPosition] = tableAliasToSCPositionsIt->second;
-            auto it = SCAliasToPosCounterMap.find(sc->columnName());
-            if (it == SCAliasToPosCounterMap.end())
-            {
-              SCAliasToPosCounterMap.insert({sc->columnName(), currentColPosition++});
-              std::cout << " 2nd case new column in the map colPosition "
-                        << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
-            }
-            else
-            {
-              std::cout << " 2nd case reusing column from the map colPosition "
-                        << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
-            }
-            assert(SCAliasToPosCounterMap[sc->columnName()] == colPosition);
-            sc->colPosition(SCAliasToPosCounterMap[sc->columnName()]);
-            // sc->colPosition(colPosition++);
-            colPosition++;
-          }
-          // do nothing with this SC
+          tryToUpdateScToUseRewrittenDerived(sc, tableAliasToSCPositionsMap);
         }
         newReturnedColumns.push_back(rc);
       }
@@ -493,28 +506,7 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
       for (auto* sc : simpleColumns)
       {
         std::cout << " filters SC " << sc->toString() << std::endl;
-        auto tableAliasToSCPositionsIt = tableAliasToSCPositionsMap.find(*sc->singleTable());
-        if (tableAliasToSCPositionsIt != tableAliasToSCPositionsMap.end())
-        {
-          auto& [newTableAlias, SCAliasToPosCounterMap, currentColPosition] =
-              tableAliasToSCPositionsIt->second;
-          std::cout << " filters map colPosition " << SCAliasToPosCounterMap[sc->columnName()] << std::endl;
-          auto it = SCAliasToPosCounterMap.find(sc->columnName());
-          if (it == SCAliasToPosCounterMap.end())
-          {
-            SCAliasToPosCounterMap.insert({sc->columnName(), currentColPosition++});
-          }
-          else
-          {
-            // noop
-          }
-          sc->colPosition(SCAliasToPosCounterMap[sc->columnName()]);
-
-          sc->schemaName("");
-          sc->tableName(newTableAlias);
-          sc->derivedTable(newTableAlias);
-          sc->tableAlias(newTableAlias);
-        }
+        tryToUpdateScToUseRewrittenDerived(sc, tableAliasToSCPositionsMap);
       }
     }
 
