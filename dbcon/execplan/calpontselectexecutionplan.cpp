@@ -1144,8 +1144,6 @@ execplan::SCSEP CalpontSelectExecutionPlan::cloneForTableWORecursiveSelectsGbObH
   newPlan->fPron = fPron;
   newPlan->fWithRollup = fWithRollup;
 
-  ColumnMap newColumnMap;
-
   // Deep copy of ReturnedColumnList
   ReturnedColumnList newReturnedCols;
 
@@ -1159,7 +1157,6 @@ execplan::SCSEP CalpontSelectExecutionPlan::cloneForTableWORecursiveSelectsGbObH
       {
         // TODO We insert multiple times if there are multiple SCs for the same RC.
         newReturnedCols.push_back(SRCP(rc->clone()));
-        newColumnMap.insert({simpleColumn->columnName(), SRCP(simpleColumn->clone())});
       }
     }
   }
@@ -1181,6 +1178,7 @@ execplan::SCSEP CalpontSelectExecutionPlan::cloneForTableWORecursiveSelectsGbObH
   // Deep copy of filter token list
   newPlan->filterTokenList(fFilterTokenList);
 
+  ColumnMap newColumnMap;
   // Deep copy of column map
   for (const auto& entry : fColumnMap)
   {

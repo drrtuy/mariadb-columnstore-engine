@@ -414,7 +414,6 @@ execplan::SCSEP createDerivedTableFromTable(execplan::CalpontSelectExecutionPlan
   for (auto [sc, colPosition] : sCsAndTheirPositions)
   {
     projectionSCs[colPosition] = sc->clone();
-    derivedSCEP->columnMap().insert({sc->columnName(), execplan::SRCP(sc->clone())});
   }
 
   std::vector<boost::shared_ptr<execplan::ReturnedColumn>> derivedProjection;
@@ -423,7 +422,11 @@ execplan::SCSEP createDerivedTableFromTable(execplan::CalpontSelectExecutionPlan
   for (auto sc : projectionSCs)
   {
     derivedProjection.push_back(execplan::SRCP(sc));
-    derivedSCEP->columnMap().insert({sc->columnName(), execplan::SRCP(sc->clone())});
+    auto it = derivedSCEP->columnMap().find(sc->columnName());
+    if (it == derivedSCEP->columnMap().end())
+    {
+      derivedSCEP->columnMap().insert({sc->columnName(), execplan::SRCP(sc->clone())});
+    }
   }
 
   derivedSCEP->returnedCols(std::move(derivedProjection));
@@ -484,6 +487,15 @@ std::pair<uint32_t, bool> findOrInsertColumnPosition(execplan::SimpleColumn* sc,
   return {it->second, false};
 }
 
+// MCOL-6148 If SC has execplan::execplan::JOIN_CORRELATED set this will create an additional ghost table in
+// uniqTupleKey in PP.
+execplan::SimpleColumn* cloneSCForDerivedProjection(execplan::SimpleColumn* sc)
+{
+  auto clone = sc->clone();
+  clone->joinInfo(execplan::NO_JOIN);
+  return clone;
+}
+
 void tryToUpdateScToUseRewrittenDerived(
     execplan::SimpleColumn* sc, optimizer::TableAliasToNewAliasAndSCPositionsMap& tableAliasToSCPositionsMap)
 {
@@ -496,7 +508,7 @@ void tryToUpdateScToUseRewrittenDerived(
 
     // Adds a new column to the map if it doesn't exist
     // TODO use unique
-    auto originalSC = sc->clone();
+    auto originalSC = cloneSCForDerivedProjection(sc);
     auto [colPosition, isNewColumn] =
         findOrInsertColumnPosition(originalSC, SCToPosCounterMap, currentColPositionCursorValue);
     if (isNewColumn)
