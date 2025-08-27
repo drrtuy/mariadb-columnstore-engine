@@ -49,6 +49,7 @@ class Row;
 namespace execplan
 {
 // Join info bit mask
+const uint64_t NO_JOIN = 0x0000;
 // const uint64_t JOIN_OUTER = 0x0001;
 const uint64_t JOIN_SEMI = 0x0002;
 const uint64_t JOIN_ANTI = 0x0004;
