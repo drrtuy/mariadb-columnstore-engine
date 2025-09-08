@@ -55,6 +55,22 @@ enum RM_PARMS
   UMSMALLSIDEMEMORY,
 };
 
+// query type of select plan.
+// TODO: move it somewhere?
+enum class IDBQueryType : uint32_t
+{
+  SELECT,
+  UPDATE,
+  DELETE,
+  INSERT_SELECT,
+  CREATE_TABLE,
+  DROP_TABLE,
+  ALTER_TABLE,
+  INSERT,
+  LOAD_DATA_INFILE,
+  UNION
+};
+
 struct RMParam
 {
   RMParam(uint32_t s, uint16_t i, uint64_t v) : sessionId(s), id(i), value(v)
@@ -96,21 +112,6 @@ class CalpontSelectExecutionPlan : public CalpontExecutionPlan
   typedef std::vector<SCEP> SelectList;
 
   typedef std::vector<RMParam> RMParmVec;
-
-  // query type of this select plan.
-#undef DELETE  // Windows defines this...
-  enum IDB_QUERYTYPE
-  {
-    SELECT,
-    UPDATE,
-    DELETE,
-    INSERT_SELECT,
-    CREATE_TABLE,
-    DROP_TABLE,
-    ALTER_TABLE,
-    INSERT,
-    LOAD_DATA_INFILE
-  };
 
   enum SE_LOCATION
   {
@@ -645,7 +646,7 @@ class CalpontSelectExecutionPlan : public CalpontExecutionPlan
   }
 
   // query type. return string for easy stats insert
-  void queryType(const uint32_t queryType)
+  void queryType(const IDBQueryType queryType)
   {
     fQueryType = queryType;
   }
@@ -653,7 +654,7 @@ class CalpontSelectExecutionPlan : public CalpontExecutionPlan
   {
     return queryTypeToString(fQueryType);
   }
-  static std::string queryTypeToString(const uint32_t queryType);
+  static std::string queryTypeToString(const IDBQueryType queryType);
 
   void priority(uint32_t p)
   {
@@ -713,7 +714,7 @@ class CalpontSelectExecutionPlan : public CalpontExecutionPlan
   {
     fDJSMaxPartitionTreeDepth = value;
   }
-  uint64_t djsMaxPartitionTreeDepth()
+  uint64_t djsMaxPartitionTreeDepth() const
   {
     return fDJSMaxPartitionTreeDepth;
   }
@@ -952,7 +953,7 @@ class CalpontSelectExecutionPlan : public CalpontExecutionPlan
   uint64_t fStringScanThreshold = ULONG_MAX;
 
   // query type
-  uint32_t fQueryType = SELECT;
+  IDBQueryType fQueryType{IDBQueryType::SELECT};
 
   uint32_t fPriority;
   uint32_t fStringTableThreshold = 20;

@@ -123,6 +123,7 @@ using ColumnName = std::string;
 using ColumnStatisticsMap =
     std::unordered_map<ColumnName, std::pair<execplan::SimpleColumn, std::vector<Histogram_json_hb*>>>;
 using TableStatisticsMap =
+   
     std::unordered_map<SchemaAndTableName, ColumnStatisticsMap, SchemaAndTableNameHash>;
 
 // This structure is used to store MDB AST -> CSEP translation context.
@@ -457,14 +458,21 @@ void parse_item(Item* item, std::vector<Item_field*>& field_vec, bool& hasNonSup
 const std::string bestTableName(const Item_field* ifp);
 
 // execution plan util functions prototypes
-execplan::ReturnedColumn* buildReturnedColumn(Item* item, gp_walk_info& gwi, bool& nonSupport,
-                                              bool isRefItem = false);
-execplan::ReturnedColumn* buildFunctionColumn(Item_func* item, gp_walk_info& gwi, bool& nonSupport,
-                                              bool selectBetweenIn = false);
-execplan::ReturnedColumn* buildArithmeticColumn(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
+execplan::ReturnedColumn* buildReturnedColumn(
+    Item* item, gp_walk_info& gwi, bool& nonSupport, bool isRefItem = false,
+    execplan::IDBQueryType queryType = execplan::IDBQueryType::SELECT);
+execplan::ReturnedColumn* buildFunctionColumn(
+    Item_func* item, gp_walk_info& gwi, bool& nonSupport, bool selectBetweenIn = false,
+    execplan::IDBQueryType queryType = execplan::IDBQueryType::SELECT);
+execplan::ReturnedColumn* buildArithmeticColumn(
+    Item_func* item, gp_walk_info& gwi, bool& nonSupport,
+    execplan::IDBQueryType queryType = execplan::IDBQueryType::SELECT);
 execplan::ConstantColumn* buildDecimalColumn(const Item* item, const std::string& str, gp_walk_info& gwi);
-execplan::SimpleColumn* buildSimpleColumn(Item_field* item, gp_walk_info& gwi);
-execplan::FunctionColumn* buildCaseFunction(Item_func* item, gp_walk_info& gwi, bool& nonSupport);
+execplan::SimpleColumn* buildSimpleColumn(Item_field* item, gp_walk_info& gwi,
+                                          execplan::IDBQueryType queryType = execplan::IDBQueryType::SELECT);
+execplan::FunctionColumn* buildCaseFunction(
+    Item_func* item, gp_walk_info& gwi, bool& nonSupport,
+    execplan::IDBQueryType queryType = execplan::IDBQueryType::SELECT);
 execplan::ParseTree* buildParseTree(Item* item, gp_walk_info& gwi, bool& nonSupport);
 execplan::ReturnedColumn* buildAggregateColumn(Item* item, gp_walk_info& gwi);
 execplan::ReturnedColumn* buildWindowFunctionColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);

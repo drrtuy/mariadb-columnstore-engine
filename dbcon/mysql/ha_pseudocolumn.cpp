@@ -8,7 +8,6 @@
 
 #include "errorids.h"
 #include "idberrorinfo.h"
-#include "exceptclasses.h"
 using namespace logging;
 
 #include "pseudocolumn.h"
