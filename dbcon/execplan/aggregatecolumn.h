@@ -161,9 +161,7 @@ class AggregateColumn : public ReturnedColumn
     fAggParms = parms;
   }
 
-  void setSimpleColumnList_(const bool extractSCsfromAggCol);
   void setSimpleColumnList() override;
-  void setSimpleColumnListExtended() override;
 
   /** return a copy of this pointer
    *

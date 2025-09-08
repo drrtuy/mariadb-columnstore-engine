@@ -83,18 +83,6 @@ void getAggCols(execplan::ParseTree* n, void* obj)
   }
 }
 
-const std::vector<SimpleColumn*>& getSCsFromRCForExtended(const SRCP& srcp)
-{
-  srcp->setSimpleColumnListExtended();
-  return srcp->simpleColumnListExtended();
-}
-
-const std::vector<SimpleColumn*>& getSCsFromRC(const SRCP& srcp)
-{
-  srcp->setSimpleColumnList();
-  return srcp->simpleColumnList();
-}
-
 /**
  * Constructors/Destructors
  */
@@ -141,36 +129,18 @@ AggregateColumn::AggregateColumn(const AggregateColumn& rhs, const uint32_t sess
 void AggregateColumn::setSimpleColumnList()
 {
   fSimpleColumnList.clear();
-  return setSimpleColumnList_(false);
-}
 
-void AggregateColumn::setSimpleColumnListExtended()
-{
-  fSimpleColumnListExtended.clear();
-  return setSimpleColumnList_(true);
-}
-
-void AggregateColumn::setSimpleColumnList_(const bool extractSCsfromAggCol)
-{
   for (const auto& parm : aggParms())
   {
     if (!parm)
       continue;
-
-    auto aggParmsAsSCVec = (extractSCsfromAggCol) ? getSCsFromRCForExtended(parm) : getSCsFromRC(parm);
-
-    for (auto* sc : aggParmsAsSCVec)
+    
+    parm->setSimpleColumnList();
+    for (auto* sc : parm->simpleColumnList())
     {
       if (sc)
       {
-        if (extractSCsfromAggCol)
-        {
-          fSimpleColumnListExtended.push_back(sc);
-        }
-        else
-        {
-          fSimpleColumnList.push_back(sc);
-        }
+        fSimpleColumnList.push_back(sc);
       }
     }
   }

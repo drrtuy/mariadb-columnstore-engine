@@ -810,11 +810,6 @@ const std::vector<SimpleColumn*>& SimpleFilter::simpleColumnList()
   return fSimpleColumnList;
 }
 
-const std::vector<SimpleColumn*>& SimpleFilter::simpleColumnListExtended()
-{
-  return fSimpleColumnListExtended;
-}
-
 void SimpleFilter::setSimpleColumnList()
 {
   SimpleColumn* lsc = dynamic_cast<SimpleColumn*>(fLhs);
@@ -841,35 +836,6 @@ void SimpleFilter::setSimpleColumnList()
     fRhs->setSimpleColumnList();
     fSimpleColumnList.insert(fSimpleColumnList.end(), fRhs->simpleColumnList().begin(),
                              fRhs->simpleColumnList().end());
-  }
-}
-
-void SimpleFilter::setSimpleColumnListExtended()
-{
-  SimpleColumn* lsc = dynamic_cast<SimpleColumn*>(fLhs);
-  SimpleColumn* rsc = dynamic_cast<SimpleColumn*>(fRhs);
-  fSimpleColumnListExtended.clear();
-
-  if (lsc)
-  {
-    fSimpleColumnListExtended.push_back(lsc);
-  }
-  else if (fLhs)
-  {
-    fLhs->setSimpleColumnListExtended();
-    fSimpleColumnList.insert(fSimpleColumnList.end(), fLhs->simpleColumnListExtended().begin(),
-                             fLhs->simpleColumnListExtended().end());
-  }
-
-  if (rsc)
-  {
-    fSimpleColumnList.push_back(rsc);
-  }
-  else if (fRhs)
-  {
-    fRhs->setSimpleColumnListExtended();
-    fSimpleColumnList.insert(fSimpleColumnList.end(), fRhs->simpleColumnListExtended().begin(),
-                             fRhs->simpleColumnListExtended().end());
   }
 }
 

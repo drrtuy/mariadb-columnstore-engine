@@ -523,14 +523,26 @@ void tryToUpdateScToUseRewrittenDerived(
 }
 
 void updateSCsUsingIteration(optimizer::TableAliasToNewAliasAndSCPositionsMap& tableAliasToSCPositionsMap,
-                             std::vector<execplan::SRCP>& rcs)
+                             std::vector<execplan::SRCP>& rcs, const bool ignoreAgg)
 {
   for (auto& rc : rcs)
   {
-    rc->setSimpleColumnListExtended();
-    for (auto* sc : rc->simpleColumnListExtended())
+    rc->setSimpleColumnList();
+    for (auto* sc : rc->simpleColumnList())
     {
       tryToUpdateScToUseRewrittenDerived(sc, tableAliasToSCPositionsMap);
+    }
+
+    if (!ignoreAgg && rc->hasAggregate())
+    {
+      for (auto* agc : rc->aggColumnList())
+      {
+        agc->setSimpleColumnList();
+        for (auto* sc : agc->simpleColumnList())
+        {
+          tryToUpdateScToUseRewrittenDerived(sc, tableAliasToSCPositionsMap);
+        }
+      }
     }
   }
 }
@@ -539,7 +551,7 @@ void updateSCsUsingWalkers(optimizer::TableAliasToNewAliasAndSCPositionsMap& tab
                            execplan::ParseTree* pt)
 {
   std::vector<execplan::SimpleColumn*> simpleColumns;
-  pt->walk(execplan::getSimpleColsExtended, &simpleColumns);
+  pt->walk(execplan::getSimpleCols, &simpleColumns);
   for (auto* sc : simpleColumns)
   {
     tryToUpdateScToUseRewrittenDerived(sc, tableAliasToSCPositionsMap);
@@ -610,7 +622,7 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
   {
     for (auto& rc : csep.returnedCols())
     {
-      updateSCsUsingIteration(tableAliasToSCPositionsMap, csep.returnedCols());
+      updateSCsUsingIteration(tableAliasToSCPositionsMap, csep.returnedCols(), false);
       newReturnedColumns.push_back(rc);
     }
 
@@ -621,13 +633,13 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
     // 3d pass over GROUP BY columns
     if (!csep.groupByCols().empty())
     {
-      updateSCsUsingIteration(tableAliasToSCPositionsMap, csep.groupByCols());
+      updateSCsUsingIteration(tableAliasToSCPositionsMap, csep.groupByCols(), true);
     }
 
     // 4th pass over ORDER BY columns
     if (!csep.orderByCols().empty())
     {
-      updateSCsUsingIteration(tableAliasToSCPositionsMap, csep.orderByCols());
+      updateSCsUsingIteration(tableAliasToSCPositionsMap, csep.orderByCols(), false);
     }
 
     // 5th pass over filters to use derived table SCs in filters
@@ -664,7 +676,7 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
           if (auto subFilters = sub->filters())
           {
             std::vector<execplan::SimpleColumn*> subSCs;
-            subFilters->walk(execplan::getSimpleColsExtended, &subSCs);
+            subFilters->walk(execplan::getSimpleCols, &subSCs);
             for (auto* sc : subSCs)
             {
               if (sc)
@@ -674,7 +686,7 @@ bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBO
           if (auto subHaving = sub->having())
           {
             std::vector<execplan::SimpleColumn*> subSCs;
-            subHaving->walk(execplan::getSimpleColsExtended, &subSCs);
+            subHaving->walk(execplan::getSimpleCols, &subSCs);
             for (auto* sc : subSCs)
             {
               if (sc)
