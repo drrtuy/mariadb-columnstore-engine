@@ -5307,7 +5307,7 @@ void extractColumnStatistics(TABLE_LIST* table_ptr, gp_walk_info& gwi)
   }
 }
 #else
-void extractColumnStatistics(Item_field* /*ifp*/, gp_walk_info& /*gwi*/)
+void extractColumnStatistics(TABLE_LIST* /*table_ptr*/, gp_walk_info& /*gwi*/)
 {
 }
 #endif
