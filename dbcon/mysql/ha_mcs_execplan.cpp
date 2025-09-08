@@ -6492,40 +6492,6 @@ int processLimitAndOffset(SELECT_LEX& select_lex, gp_walk_info& gwi, SCSEP& csep
   return 0;
 }
 
-// Loop over available indexes to find and extract corresponding EI column statistics
-// for the first column of the index if any.
-// Statistics is stored in GWI context.
-// Mock for ES 10.6
-#if MYSQL_VERSION_ID >= 110408
-void extractColumnStatistics(Item_field* ifp, gp_walk_info& gwi)
-{
-  for (uint j = 0; j < ifp->field->table->s->keys; j++)
-  {
-    for (uint i = 0; i < ifp->field->table->s->key_info[j].usable_key_parts; i++)
-    {
-      if (ifp->field->table->s->key_info[j].key_part[i].fieldnr == ifp->field->field_index + 1)
-      {
-        if (i == 0 && ifp->field->read_stats)
-        {
-          assert(ifp->field->table->s);
-          auto* histogram = dynamic_cast<Histogram_json_hb*>(ifp->field->read_stats->histogram);
-          if (histogram)
-          {
-            SchemaAndTableName tableName = {ifp->field->table->s->db.str,
-                                            ifp->field->table->s->table_name.str};
-            gwi.tableStatisticsMap[tableName][ifp->field->field_name.str] = *histogram;
-          }
-        }
-      }
-    }
-  }
-}
-#else
-void extractColumnStatistics(Item_field* /*ifp*/, gp_walk_info& /*gwi*/)
-{
-}
-#endif
-
 /*@brief  Process SELECT part of a query or sub-query      */
 /***********************************************************
  * DESCRIPTION:

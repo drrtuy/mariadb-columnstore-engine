@@ -123,7 +123,6 @@ using ColumnName = std::string;
 using ColumnStatisticsMap =
     std::unordered_map<ColumnName, std::pair<execplan::SimpleColumn, std::vector<Histogram_json_hb*>>>;
 using TableStatisticsMap =
-   
     std::unordered_map<SchemaAndTableName, ColumnStatisticsMap, SchemaAndTableNameHash>;
 
 // This structure is used to store MDB AST -> CSEP translation context.
@@ -405,9 +404,9 @@ struct cal_connection_info
   bool isCacheInsert;
   std::string extendedStats;
   std::string miniStats;
-  std::string queryPlanOriginal;     // CSEP string before RBO
-  std::string queryPlanOptimized;    // CSEP string after RBO
-  std::string rboAppliedRules;       // Comma-separated list of applied RBO rules
+  std::string queryPlanOriginal;   // CSEP string before RBO
+  std::string queryPlanOptimized;  // CSEP string after RBO
+  std::string rboAppliedRules;     // Comma-separated list of applied RBO rules
   messageqcpp::MessageQueueClient* dmlProc;
   ha_rows rowsHaveInserted;
   ColNameList colNameList;
