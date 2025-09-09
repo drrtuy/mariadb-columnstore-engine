@@ -92,6 +92,8 @@ IFLAG = os.path.join(MCS_ETC_PATH, 'container-initialized')
 LIBJEMALLOC_DEFAULT_PATH = os.path.join(MCS_DATA_PATH, 'libjemalloc.so.2')
 MCS_LOG_PATH = '/var/log/mariadb/columnstore'
 
+# BRM shmem lock inspection/reset tool
+SHMEM_LOCKS_PATH = os.path.join(MCS_INSTALL_BIN, 'mcs-shmem-locks')
 
 # client constants
 CMAPI_PORT = 8640  #TODO: use it in all places
