@@ -15,6 +15,7 @@ from typing import Optional
 import requests
 from lxml import etree
 from mcs_node_control.models.node_config import NodeConfig
+from tracing.traced_session import get_traced_session
 
 from cmapi_server import helpers
 from cmapi_server.constants import (
@@ -25,7 +26,6 @@ from cmapi_server.constants import (
     MCS_DATA_PATH,
 )
 from cmapi_server.managers.network import NetworkManager
-from tracing.traced_session import get_traced_session
 
 PMS_NODE_PORT = '8620'
 EXEMGR_NODE_PORT = '8601'
@@ -640,7 +640,7 @@ def _rebalance_dbroots(root, test_mode=False):
                         # timed out
                         # possible node is not ready, leave retry as-is
                         pass
-                    except Exception as e:
+                    except Exception:
                         retry = False
 
                 if not found_master:

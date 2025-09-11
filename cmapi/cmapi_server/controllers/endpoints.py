@@ -12,7 +12,7 @@ import cherrypy
 import pyotp
 import requests
 
-from cmapi_server.exceptions import CMAPIBasicError
+from cmapi_server.exceptions import CMAPIBasicError, cmapi_error_to_422
 from cmapi_server.constants import (
     DEFAULT_MCS_CONF_PATH, DEFAULT_SM_CONF_PATH, EM_PATH_SUFFIX,
     MCS_BRM_CURRENT_PATH, MCS_EM_PATH, S3_BRM_CURRENT_PATH, SECRET_KEY,
@@ -924,14 +924,12 @@ class ClusterController:
         if node is None:
             raise_422_error(module_logger, func_name, 'missing node argument')
 
-        try:
+        with cmapi_error_to_422(module_logger, func_name):
             if not in_transaction:
                 with TransactionManager(extra_nodes=[node]):
                     response = ClusterHandler.add_node(node, config)
             else:
                 response = ClusterHandler.add_node(node, config)
-        except CMAPIBasicError as err:
-            raise_422_error(module_logger, func_name, err.message)
 
         module_logger.debug(f'{func_name} returns {str(response)}')
         return response
@@ -953,14 +951,12 @@ class ClusterController:
         if node is None:
             raise_422_error(module_logger, func_name, 'missing node argument')
 
-        try:
+        with cmapi_error_to_422(module_logger, func_name):
             if not in_transaction:
                 with TransactionManager(remove_nodes=[node]):
                     response = ClusterHandler.remove_node(node, config)
             else:
                 response = ClusterHandler.remove_node(node, config)
-        except CMAPIBasicError as err:
-            raise_422_error(module_logger, func_name, err.message)
 
         module_logger.debug(f'{func_name} returns {str(response)}')
         return response
@@ -1079,10 +1075,8 @@ class ClusterController:
                 module_logger, func_name, 'Wrong verification key.'
             )
 
-        try:
+        with cmapi_error_to_422(module_logger, func_name):
             response = ClusterHandler.set_api_key(new_api_key, totp_key)
-        except CMAPIBasicError as err:
-            raise_422_error(module_logger, func_name, err.message)
 
         module_logger.debug(f'{func_name} returns {str(response)}')
         return response
