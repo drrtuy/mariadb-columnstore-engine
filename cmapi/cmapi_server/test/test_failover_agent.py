@@ -1,13 +1,13 @@
 import logging
 import socket
+from unittest.mock import patch
+
+from mcs_node_control.models.node_config import NodeConfig
 
 from cmapi_server.failover_agent import FailoverAgent
+from cmapi_server.managers.network import NetworkManager
 from cmapi_server.node_manipulation import add_node, remove_node
-from mcs_node_control.models.node_config import NodeConfig
-from cmapi_server.test.unittest_global import (
-    tmp_mcs_config_filename, BaseNodeManipTestCase
-)
-
+from cmapi_server.test.unittest_global import BaseNodeManipTestCase, tmp_mcs_config_filename
 
 logging.basicConfig(level='DEBUG')
 
@@ -18,10 +18,12 @@ class TestFailoverAgent(BaseNodeManipTestCase):
         self.tmp_files = ('./activate0.xml', './activate1.xml')
         hostaddr = socket.gethostbyname(socket.gethostname())
         fa = FailoverAgent()
-        fa.activateNodes(
-            [self.NEW_NODE_NAME], tmp_mcs_config_filename, self.tmp_files[0],
-            test_mode=True
-        )
+        # Bypass DNS validation for hostname-based addition in tests
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            fa.activateNodes(
+                [self.NEW_NODE_NAME], tmp_mcs_config_filename, self.tmp_files[0],
+                test_mode=True
+            )
         add_node(
             hostaddr, self.tmp_files[0], self.tmp_files[1]
         )
@@ -50,10 +52,11 @@ class TestFailoverAgent(BaseNodeManipTestCase):
         add_node(
             hostaddr, tmp_mcs_config_filename, self.tmp_files[0]
         )
-        fa.activateNodes(
-            [self.NEW_NODE_NAME], self.tmp_files[0], self.tmp_files[1],
-            test_mode=True
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            fa.activateNodes(
+                [self.NEW_NODE_NAME], self.tmp_files[0], self.tmp_files[1],
+                test_mode=True
+            )
         fa.deactivateNodes(
             [self.NEW_NODE_NAME], self.tmp_files[1], self.tmp_files[2],
             test_mode=True
@@ -89,10 +92,11 @@ class TestFailoverAgent(BaseNodeManipTestCase):
         )
         fa = FailoverAgent()
         hostaddr = socket.gethostbyname(socket.gethostname())
-        fa.activateNodes(
-            [self.NEW_NODE_NAME], tmp_mcs_config_filename, self.tmp_files[0],
-            test_mode=True
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            fa.activateNodes(
+                [self.NEW_NODE_NAME], tmp_mcs_config_filename, self.tmp_files[0],
+                test_mode=True
+            )
         add_node(
             hostaddr, self.tmp_files[0], self.tmp_files[1]
         )
