@@ -7,6 +7,7 @@ import socket
 from os import mkdir, replace, chown
 from pathlib import Path
 from shutil import copyfile
+from typing import Iterator
 from xml.dom import minidom   # to pick up pretty printing functionality
 
 from lxml import etree
@@ -366,12 +367,10 @@ class NodeConfig:
 
         return False
 
-    def get_network_addresses(self):
+    def get_network_addresses(self) -> Iterator[str]:
         """Retrievs the list of the network addresses
 
         Generator that yields network interface addresses.
-
-        :rtype: str
         """
         for ni in get_network_interfaces():
             for fam in [socket.AF_INET, socket.AF_INET6]:
