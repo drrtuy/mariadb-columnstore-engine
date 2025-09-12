@@ -141,18 +141,6 @@ void gp_walk_info::mergeTableStatistics(const TableStatisticsMap& aTableStatisti
   }
 }
 
-std::optional<ColumnStatisticsMap> gp_walk_info::findStatisticsForATable(
-    SchemaAndTableName& schemaAndTableName)
-{
-  auto tableStatisticsMapIt = tableStatisticsMap.find(schemaAndTableName);
-  if (tableStatisticsMapIt == tableStatisticsMap.end())
-  {
-    return std::nullopt;
-  }
-
-  return {tableStatisticsMapIt->second};
-}
-
 }  // namespace cal_impl_if
 
 namespace

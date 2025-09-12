@@ -19,12 +19,12 @@
 
 #define PREFER_MY_CONFIG_H
 #include <my_config.h>
-#include "idb_mysql.h"
+#include <dbcon/mysql/idb_mysql.h>
 
 #include "execplan/calpontselectexecutionplan.h"
 #include "rulebased_optimizer.h"
 
 namespace optimizer {
-  bool parallelCESFilter(execplan::CalpontSelectExecutionPlan& csep);
-  bool applyParallelCES(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
+  bool predicatePushdownFilter(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
+  bool applyPredicatePushdown(execplan::CalpontSelectExecutionPlan& csep, optimizer::RBOptimizerContext& ctx);
 }
