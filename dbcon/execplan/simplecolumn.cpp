@@ -48,6 +48,7 @@ using namespace joblist;
 #include "functioncolumn.h"
 #include "simplecolumn.h"
 #include "simplefilter.h"
+#include "selectfilter.h"
 #include "aggregatecolumn.h"
 #include "constantfilter.h"
 #include "../../utils/windowfunction/windowfunction.h"
@@ -95,12 +96,13 @@ void getSimpleColsExtended(execplan::ParseTree* n, void* obj)
 {
   vector<SimpleColumn*>* list = reinterpret_cast<vector<SimpleColumn*>*>(obj);
   TreeNode* tn = n->data();
-  SimpleColumn* sc = dynamic_cast<SimpleColumn*>(tn);
-  FunctionColumn* fc = dynamic_cast<FunctionColumn*>(tn);
   ArithmeticColumn* ac = dynamic_cast<ArithmeticColumn*>(tn);
-  SimpleFilter* sf = dynamic_cast<SimpleFilter*>(tn);
-  ConstantFilter* cf = dynamic_cast<ConstantFilter*>(tn);
   AggregateColumn* agc = dynamic_cast<AggregateColumn*>(tn);
+  ConstantFilter* cf = dynamic_cast<ConstantFilter*>(tn);
+  FunctionColumn* fc = dynamic_cast<FunctionColumn*>(tn);
+  SimpleColumn* sc = dynamic_cast<SimpleColumn*>(tn);
+  SelectFilter* selectFilter = dynamic_cast<SelectFilter*>(tn);
+  SimpleFilter* sf = dynamic_cast<SimpleFilter*>(tn);
 
   if (sc)
   {
@@ -125,6 +127,11 @@ void getSimpleColsExtended(execplan::ParseTree* n, void* obj)
   {
     sf->setSimpleColumnListExtended();
     list->insert(list->end(), sf->simpleColumnListExtended().begin(), sf->simpleColumnListExtended().end());
+  }
+  else if (selectFilter)
+  {
+    selectFilter->setSimpleColumnListExtended();
+    list->insert(list->end(), selectFilter->simpleColumnListExtended().begin(), selectFilter->simpleColumnListExtended().end());
   }
   else if (cf)
   {
