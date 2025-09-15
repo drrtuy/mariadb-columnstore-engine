@@ -13,14 +13,12 @@ USE rbo_parallel_ces_tpch;
 # Turn on plan logging to capture CSEP strings
 SELECT calsettrace(1);
 
-# Enable RBO
---source ../include/enable_rbo_parallel_ces.inc
-
 --source ../include/create_tpch_lineitem.inc
 
 set histogram_size=2;
 ANALYZE TABLE lineitem PERSISTENT FOR COLUMNS(l_orderkey) INDEXES();
 
+# Enable RBO
 --source ../include/enable_rbo_parallel_ces.inc
 
 select
