@@ -6,12 +6,13 @@ from typing import Optional
 
 from mcs_node_control.models.misc import get_dbrm_master
 from mcs_node_control.models.node_config import NodeConfig
+from tracing.traced_session import get_traced_session
 
 from cmapi_server.constants import (
     CMAPI_CONF_PATH,
     DEFAULT_MCS_CONF_PATH,
 )
-from cmapi_server.exceptions import CMAPIBasicError
+from cmapi_server.exceptions import CMAPIBasicError, exc_to_cmapi_error
 from cmapi_server.helpers import (
     broadcast_new_config,
     get_active_nodes,
@@ -27,7 +28,6 @@ from cmapi_server.node_manipulation import (
     remove_node,
     switch_node_maintenance,
 )
-from tracing.traced_session import get_traced_session
 
 
 class ClusterAction(Enum):
@@ -171,7 +171,7 @@ class ClusterHandler:
 
         response = {'timestamp': str(datetime.now())}
 
-        try:
+        with exc_to_cmapi_error(prefix='Error while adding node'):
             add_node(
                 node, input_config_filename=config,
                 output_config_filename=config
@@ -181,8 +181,6 @@ class ClusterHandler:
                     host=node, input_config_filename=config,
                     output_config_filename=config
                 )
-        except Exception as err:
-            raise CMAPIBasicError('Error while adding node.') from err
 
         response['node_id'] = node
         update_revision_and_manager(
@@ -218,13 +216,11 @@ class ClusterHandler:
         )
         response = {'timestamp': str(datetime.now())}
 
-        try:
+        with exc_to_cmapi_error(prefix='Error while removing node'):
             remove_node(
                 node, input_config_filename=config,
                 output_config_filename=config
             )
-        except Exception as err:
-            raise CMAPIBasicError('Error while removing node.') from err
 
         response['node_id'] = node
         active_nodes = get_active_nodes(config)

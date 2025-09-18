@@ -1,15 +1,15 @@
 import logging
 import socket
+from unittest.mock import patch
 
 from lxml import etree
+from mcs_node_control.models.node_config import NodeConfig
 
 from cmapi_server import node_manipulation
 from cmapi_server.constants import MCS_DATA_PATH
-from cmapi_server.test.unittest_global import (
-    tmp_mcs_config_filename, BaseNodeManipTestCase
-)
-from mcs_node_control.models.node_config import NodeConfig
-
+from cmapi_server.exceptions import CMAPIBasicError
+from cmapi_server.managers.network import NetworkManager
+from cmapi_server.test.unittest_global import BaseNodeManipTestCase, tmp_mcs_config_filename
 
 logging.basicConfig(level='DEBUG')
 
@@ -21,9 +21,11 @@ class NodeManipTester(BaseNodeManipTestCase):
             './test-output0.xml','./test-output1.xml','./test-output2.xml'
         )
         hostaddr = socket.gethostbyname(socket.gethostname())
-        node_manipulation.add_node(
-            self.NEW_NODE_NAME, tmp_mcs_config_filename, self.tmp_files[0]
-        )
+        # Bypass DNS validation to avoid dependence on external DNS for tests
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            node_manipulation.add_node(
+                self.NEW_NODE_NAME, tmp_mcs_config_filename, self.tmp_files[0]
+            )
         node_manipulation.add_node(
             hostaddr, self.tmp_files[0], self.tmp_files[1]
         )
@@ -69,9 +71,10 @@ class NodeManipTester(BaseNodeManipTestCase):
         etree.SubElement(sysconf_node, 'DBRoot10').text = '/dummy_path/data10'
         nc.write_config(root, self.tmp_files[0])
 
-        node_manipulation.add_node(
-            self.NEW_NODE_NAME, self.tmp_files[0], self.tmp_files[1]
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            node_manipulation.add_node(
+                self.NEW_NODE_NAME, self.tmp_files[0], self.tmp_files[1]
+            )
 
         # get a NodeConfig, read test.xml
         # look for some of the expected changes.
@@ -113,12 +116,13 @@ class NodeManipTester(BaseNodeManipTestCase):
 
         # add a node, verify we can add a dbroot to each of them
         hostname = socket.gethostname()
-        node_manipulation.add_node(
-            hostname, tmp_mcs_config_filename, self.tmp_files[1]
-        )
-        node_manipulation.add_node(
-            self.NEW_NODE_NAME, self.tmp_files[1], self.tmp_files[2]
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            node_manipulation.add_node(
+                hostname, tmp_mcs_config_filename, self.tmp_files[1]
+            )
+            node_manipulation.add_node(
+                self.NEW_NODE_NAME, self.tmp_files[1], self.tmp_files[2]
+            )
         id1 = node_manipulation.add_dbroot(
             self.tmp_files[2], self.tmp_files[3], host=self.NEW_NODE_NAME
         )
@@ -152,9 +156,10 @@ class NodeManipTester(BaseNodeManipTestCase):
     def test_change_primary_node(self):
         # add a node, make it the primary, verify expected result
         self.tmp_files = ('./primary-node0.xml', './primary-node1.xml')
-        node_manipulation.add_node(
-            self.NEW_NODE_NAME, tmp_mcs_config_filename, self.tmp_files[0]
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            node_manipulation.add_node(
+                self.NEW_NODE_NAME, tmp_mcs_config_filename, self.tmp_files[0]
+            )
         node_manipulation.move_primary_node(
             self.tmp_files[0], self.tmp_files[1]
         )
@@ -179,17 +184,19 @@ class NodeManipTester(BaseNodeManipTestCase):
         self.tmp_files = (
             './tud-0.xml', './tud-1.xml', './tud-2.xml', './tud-3.xml',
         )
-        node_manipulation.add_node(
-            self.NEW_NODE_NAME, tmp_mcs_config_filename, self.tmp_files[0]
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            node_manipulation.add_node(
+                self.NEW_NODE_NAME, tmp_mcs_config_filename, self.tmp_files[0]
+            )
         root = NodeConfig().get_current_config_root(self.tmp_files[0])
         (name, addr) = node_manipulation.find_dbroot1(root)
         self.assertEqual(name, self.NEW_NODE_NAME)
 
         # add a second node and more dbroots to make the test slightly more robust
-        node_manipulation.add_node(
-            socket.gethostname(), self.tmp_files[0], self.tmp_files[1]
-        )
+        with patch.object(NetworkManager, 'validate_hostname_fwd_rev', return_value=None):
+            node_manipulation.add_node(
+                socket.gethostname(), self.tmp_files[0], self.tmp_files[1]
+            )
         node_manipulation.add_dbroot(
             self.tmp_files[1], self.tmp_files[2], socket.gethostname()
         )
@@ -209,3 +216,19 @@ class NodeManipTester(BaseNodeManipTestCase):
             caught_it = True
 
         self.assertTrue(caught_it)
+
+    def test_add_node_hostname_reverse_mismatch(self):
+        """Adding a node by hostname should fail if reverse DNS doesn't map
+        back to the provided hostname (neither exact nor FQDN starting with it).
+        """
+        self.tmp_files = ('./rev-mismatch-0.xml',)
+        bad_hostname = 'badhost'
+
+        with patch.object(NetworkManager, 'is_ip', return_value=False), \
+             patch.object(NetworkManager, 'is_only_loopback_hostname', return_value=False), \
+             patch.object(NetworkManager, 'resolve_hostname_to_ip', return_value=['10.0.0.5']), \
+             patch.object(NetworkManager, 'get_hostnames_by_ip', return_value=['other.example.com', 'alias.other.example.com']):
+            with self.assertRaises(CMAPIBasicError):
+                node_manipulation.add_node(
+                    bad_hostname, tmp_mcs_config_filename, self.tmp_files[0]
+                )

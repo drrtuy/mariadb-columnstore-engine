@@ -15,6 +15,7 @@ from typing import Optional
 import requests
 from lxml import etree
 from mcs_node_control.models.node_config import NodeConfig
+from tracing.traced_session import get_traced_session
 
 from cmapi_server import helpers
 from cmapi_server.constants import (
@@ -25,7 +26,6 @@ from cmapi_server.constants import (
     MCS_DATA_PATH,
 )
 from cmapi_server.managers.network import NetworkManager
-from tracing.traced_session import get_traced_session
 
 PMS_NODE_PORT = '8620'
 EXEMGR_NODE_PORT = '8601'
@@ -61,7 +61,6 @@ def switch_node_maintenance(
     node_config.write_config(config_root, filename=output_config_filename)
     # TODO: probably move publishing to cherrypy.engine failover channel here?
 
-
 def add_node(
     node: str, input_config_filename: str = DEFAULT_MCS_CONF_PATH,
     output_config_filename: Optional[str] = None,
@@ -95,6 +94,11 @@ def add_node(
     """
     node_config = NodeConfig()
     c_root = node_config.get_current_config_root(input_config_filename)
+
+    # If a hostname (not IP) is provided, ensure fwd/rev DNS consistency.
+    # Skip validation for localhost aliases to preserve legacy single-node flows.
+    if not NetworkManager.is_ip(node) and not NetworkManager.is_only_loopback_hostname(node):
+        NetworkManager.validate_hostname_fwd_rev(node)
 
     try:
         if not _replace_localhost(c_root, node):
@@ -636,7 +640,7 @@ def _rebalance_dbroots(root, test_mode=False):
                         # timed out
                         # possible node is not ready, leave retry as-is
                         pass
-                    except Exception as e:
+                    except Exception:
                         retry = False
 
                 if not found_master:
