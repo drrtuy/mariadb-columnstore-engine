@@ -97,7 +97,7 @@ def add_node(
 
     # If a hostname (not IP) is provided, ensure fwd/rev DNS consistency.
     # Skip validation for localhost aliases to preserve legacy single-node flows.
-    if not NetworkManager.is_ip(node) and node not in LOCALHOSTS:
+    if not NetworkManager.is_ip(node) and not NetworkManager.is_only_loopback_hostname(node):
         NetworkManager.validate_hostname_fwd_rev(node)
 
     try:
