@@ -3,6 +3,7 @@
 --echo # in outer select to foreign engines
 
 --source ../include/have_columnstore.inc
+--source ../include/disable_11.8.inc
 
 if (!$MASTER_MYPORT)
 {
